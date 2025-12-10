@@ -1,0 +1,8 @@
+name = "typemeteor"
+compatibility_date = "2025-12-10"
+
+[site]
+bucket = "./"
+
+[[assets]]
+directory = "./"
