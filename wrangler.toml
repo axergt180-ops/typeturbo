@@ -1,8 +1,8 @@
 name = "typemeteor"
-compatibility_date = "2025-12-10"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "public"
 
-[site]
-bucket = "./"
-
-[[assets]]
-directory = "./"
+[[d1_databases]]
+binding = "DB"
+database_name = "typemeteor-db"
+database_id = "9b2ba2eb-8230-4b46-8c6a-8ee195c7fcef"

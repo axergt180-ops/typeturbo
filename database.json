@@ -1,0 +1,16 @@
+{
+  "scores": [
+    {
+      "id": 1,
+      "name": "tes",
+      "wpm": 73,
+      "accuracy": 100,
+      "language": "indonesian",
+      "correctWords": 73,
+      "incorrectWords": 0,
+      "timestamp": "2025-12-10T20:15:21.463Z",
+      "date": "11/12/2025"
+    }
+  ],
+  "lastId": 1
+}

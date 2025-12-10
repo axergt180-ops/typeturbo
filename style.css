@@ -1,0 +1,144 @@
+/* Custom styles for TypeMeteor */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Smooth transitions */
+button,
+input {
+    transition: all 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Word highlighting animation */
+.text-blue-500 {
+    animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Input focus effect */
+#typing-input:focus {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Button hover effect */
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+/* Results modal animation */
+#results-modal {
+    animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    #words-display {
+        font-size: 1.125rem;
+        padding: 1rem;
+    }
+    
+    #typing-input {
+        font-size: 1rem;
+        padding: 0.75rem;
+    }
+    
+    .grid-cols-3 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+        gap: 1rem;
+    }
+    
+    .grid-cols-2 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+}
+
+/* Disable text selection in word display */
+#words-display {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+}
+
+/* Language button active state */
+#language-buttons button.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Loading state */
+.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Success message */
+.success-message {
+    background-color: #10b981;
+    color: white;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
