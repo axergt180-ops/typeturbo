@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Enable Edge Runtime for Cloudflare Pages
+export const runtime = 'edge';
+
 // In-memory storage for demo purposes
 // In production, use a database like PostgreSQL, MongoDB, or Cloudflare D1
 let leaderboardData: Record<string, any[]> = {};
