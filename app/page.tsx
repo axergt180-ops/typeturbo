@@ -189,7 +189,7 @@ export default function Homepage() {
                 className="flex-1 bg-slate-900/90 border border-slate-700/50 rounded-2xl px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:border-slate-600 hover:bg-slate-800/90 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)]">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center">
-                    <img src="/icon/restart.png" alt="Restart Icon" className="w-8 h-8" />
+                    <img src="/icon/meteoricon.png" alt="Restart Icon" className="w-8 h-8" />
                   </div>
                   <div className="text-left">
                     <p className="text-[11px] md:text-xs uppercase tracking-[0.25em] text-gray-400">
@@ -210,7 +210,7 @@ export default function Homepage() {
                   <p className="text-lg md:text-xl font-black">Explore Leaderboard</p>
                 </div>
                 <div className="w-10 h-10 rounded-xl border border-white/30 flex items-center justify-center">
-                  <img src="/icon/right-arrow.png" alt="Arrow" className="w-6 h-6" />
+                  <img src="/icon/rocket.png" alt="Arrow" className="w-6 h-6" />
                 </div>
               </button>
             </div>
