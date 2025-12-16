@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+export const runtime = 'edge';
+
 // Types
 interface TypingStats {
   correctWords: number;
