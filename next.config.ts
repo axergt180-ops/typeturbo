@@ -1,12 +1,9 @@
-// next.config.ts
-import type { NextConfig } from 'next';
+import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: 'export', // Enable static export
   images: {
-    unoptimized: true, // Required for static export
+    unoptimized: true,
   },
-  trailingSlash: true,
 };
 
 export default nextConfig;
