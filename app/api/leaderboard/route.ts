@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Enable Edge Runtime for Cloudflare Pages
 export const runtime = 'edge';
-
-// In-memory storage for demo purposes
-// In production, use a database like PostgreSQL, MongoDB, or Cloudflare D1
-let leaderboardData: Record<string, any[]> = {};
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,71 +9,71 @@ export async function POST(request: NextRequest) {
 
     // Validation
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Name is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
     if (typeof wpm !== 'number' || wpm < 0) {
-      return NextResponse.json(
-        { error: 'Valid WPM is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Valid WPM is required' }, { status: 400 });
     }
 
     if (typeof accuracy !== 'number' || accuracy < 0 || accuracy > 100) {
-      return NextResponse.json(
-        { error: 'Valid accuracy (0-100) is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Valid accuracy (0-100) is required' }, { status: 400 });
     }
 
     if (!language || typeof language !== 'string') {
-      return NextResponse.json(
-        { error: 'Language is required' },
-        { status: 400 }
-      );
-    }
-
-    // Initialize language array if not exists
-    if (!leaderboardData[language]) {
-      leaderboardData[language] = [];
+      return NextResponse.json({ error: 'Language is required' }, { status: 400 });
     }
 
     // Create score entry
     const scoreEntry = {
-      name: name.trim().slice(0, 50), // Limit name length
+      name: name.trim().slice(0, 50),
       wpm: Math.round(wpm),
       accuracy: Math.round(accuracy),
       language: language,
       timestamp: new Date().toISOString()
     };
 
-    // Add to leaderboard
-    leaderboardData[language].push(scoreEntry);
+    // Access D1 database from Cloudflare Pages environment
+    // @ts-ignore - Cloudflare Pages D1 binding
+    const DB = process.env.DB;
 
-    // Keep only top 1000 scores per language to prevent memory issues
-    if (leaderboardData[language].length > 1000) {
-      leaderboardData[language] = leaderboardData[language]
-        .sort((a, b) => {
-          if (b.wpm !== a.wpm) return b.wpm - a.wpm;
-          return b.accuracy - a.accuracy;
-        })
-        .slice(0, 1000);
+    if (DB) {
+      try {
+        // @ts-ignore
+        await DB.prepare(
+          'INSERT INTO leaderboard (name, wpm, accuracy, language, timestamp) VALUES (?, ?, ?, ?, ?)'
+        ).bind(
+          scoreEntry.name,
+          scoreEntry.wpm,
+          scoreEntry.accuracy,
+          scoreEntry.language,
+          scoreEntry.timestamp
+        ).run();
+
+        return NextResponse.json({
+          success: true,
+          score: scoreEntry,
+          message: 'Score saved successfully to database'
+        });
+      } catch (dbError: any) {
+        console.error('Database insert error:', dbError);
+        return NextResponse.json({
+          error: 'Database error',
+          message: dbError.message
+        }, { status: 500 });
+      }
+    } else {
+      return NextResponse.json({
+        error: 'Database not configured',
+        message: 'D1 database binding not found'
+      }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      score: scoreEntry,
-      message: 'Score saved successfully'
-    });
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving score:', error);
-    return NextResponse.json(
-      { error: 'Failed to save score' },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+      error: 'Failed to save score',
+      message: error.message 
+    }, { status: 500 });
   }
 }
