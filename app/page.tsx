@@ -53,17 +53,17 @@ export default function Homepage() {
   }, []);
 
   const loadLeaderboard = async () => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL;
-      const response = await fetch(`${apiUrl}/leaderboard?limit=8`);
-      const data = await response.json();
-      setLeaderboard(data.leaderboard || []);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error loading leaderboard:', error);
-      setLoading(false);
-    }
-  };
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL;
+    const response = await fetch(`${apiUrl}/leaderboard?limit=8`);
+    const data = await response.json() as { leaderboard?: any[] };
+    setLeaderboard(data.leaderboard || []);
+    setLoading(false);
+  } catch (error) {
+    console.error('Error loading leaderboard:', error);
+    setLoading(false);
+  }
+};
 
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
