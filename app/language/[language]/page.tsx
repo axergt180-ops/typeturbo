@@ -15,6 +15,18 @@ interface TypingStats {
   accuracy: number;
 }
 
+interface WordsAPIResponse {
+  words: string[];
+  language: string;
+  total: number;
+}
+
+interface LeaderboardAPIResponse {
+  scores: any[];
+  language: string;
+  total: number;
+}
+
 interface TypedWord {
   original: string;
   isCorrect: boolean;
@@ -107,22 +119,22 @@ export default function TypingTestPage() {
   }, [isActive, stats.timeLeft]);
 
   // Use local API for words, Cloudflare for leaderboard
-  const wordsApiUrl = process.env.NEXT_PUBLIC_WORDS_API_URL || 'http://localhost:3000/api';
-  const leaderboardApiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL || 'https://typemeteor.kikomik.workers.dev/api';
+  const wordsApiUrl = process.env.NEXT_PUBLIC_WORDS_API_URL;
+  const leaderboardApiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL ;
 
   const loadWords = async () => {
-    try {
-      const response = await fetch(`${wordsApiUrl}/words/${language}?count=500`);
-      const data = await response.json();
-      
-      if (data.words && data.words.length > 0) {
-        setAllWords(data.words);
-        generateWords(data.words);
-      }
-    } catch (error) {
-      console.error('Error loading words:', error);
+  try {
+    const response = await fetch(`${wordsApiUrl}/words/${language}?count=500`);
+    const data = await response.json() as WordsAPIResponse;
+
+    if (data.words && data.words.length > 0) {
+      setAllWords(data.words);
+      generateWords(data.words);
     }
-  };
+  } catch (error) {
+    console.error('Error loading words:', error);
+  }
+};
 
   const generateWords = (sourceWords: string[]) => {
     const newWords: string[] = [];
@@ -133,31 +145,32 @@ export default function TypingTestPage() {
     setWords(newWords);
   };
 
-  const loadLeaderboard = async () => {
-    try {
-      const response = await fetch(`${leaderboardApiUrl}/leaderboard/${language}`);
-      
-      // Check if response is OK and is JSON
-      if (!response.ok) {
-        console.log('Leaderboard not available yet (404)');
-        setLeaderboard([]);
-        return;
-      }
-      
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        console.log('Leaderboard returned non-JSON response');
-        setLeaderboard([]);
-        return;
-      }
-      
-      const data = await response.json();
-      setLeaderboard(data.scores || []);
-    } catch (error) {
-      console.error('Error loading leaderboard:', error);
+const loadLeaderboard = async () => {
+  try {
+    const response = await fetch(`${leaderboardApiUrl}/leaderboard/${language}`);
+    
+    // Check if response is OK and is JSON
+    if (!response.ok) {
+      console.log('Leaderboard not available yet (404)');
       setLeaderboard([]);
+      return;
     }
-  };
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.log('Leaderboard returned non-JSON response');
+      setLeaderboard([]);
+      return;
+    }
+    
+    // Add type assertion here
+    const data = await response.json() as LeaderboardAPIResponse;
+    setLeaderboard(data.scores || []);
+  } catch (error) {
+    console.error('Error loading leaderboard:', error);
+    setLeaderboard([]);
+  }
+};
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
