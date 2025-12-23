@@ -15,12 +15,6 @@ interface TypingStats {
   accuracy: number;
 }
 
-interface WordsAPIResponse {
-  words: string[];
-  language: string;
-  total: number;
-}
-
 interface LeaderboardAPIResponse {
   scores: any[];
   language: string;
@@ -81,12 +75,15 @@ export default function TypingTestPage() {
   const [isFinished, setIsFinished] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [playerName, setPlayerName] = useState('');
+  const [rows, setRows] = useState<number[][]>([]);
   const [currentVisibleRow, setCurrentVisibleRow] = useState(0);
+  const [wordsLoading, setWordsLoading] = useState(true);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const config = languageConfig[language];
+  const wordsPerRow = 10; // 10 words per row
 
   // Load words on mount
   useEffect(() => {
@@ -118,23 +115,36 @@ export default function TypingTestPage() {
     };
   }, [isActive, stats.timeLeft]);
 
-  // Use local API for words, Cloudflare for leaderboard
-  const wordsApiUrl = process.env.NEXT_PUBLIC_WORDS_API_URL;
-  const leaderboardApiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL ;
+  const leaderboardApiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL || 'https://typemeteor.com/api';
 
   const loadWords = async () => {
-  try {
-    const response = await fetch(`${wordsApiUrl}/words/${language}?count=500`);
-    const data = await response.json() as WordsAPIResponse;
-
-    if (data.words && data.words.length > 0) {
-      setAllWords(data.words);
-      generateWords(data.words);
+    try {
+      setWordsLoading(true);
+      
+      const response = await fetch('https://gist.githubusercontent.com/axergt180-ops/e7272f017482486efca9c86ad72b7909/raw/words-data.json');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json() as Record<string, string[]>;
+      const languageWords = data[language];
+      
+      if (languageWords && Array.isArray(languageWords) && languageWords.length > 0) {
+        console.log(`Loaded ${languageWords.length} words for ${language}`);
+        setAllWords(languageWords);
+        generateWords(languageWords);
+        setWordsLoading(false);
+      } else {
+        console.error('No words found for language:', language);
+        setWordsLoading(false);
+      }
+    } catch (error) {
+      console.error('Error loading words:', error);
+      setWordsLoading(false);
+      alert('Failed to load words. Please refresh the page.');
     }
-  } catch (error) {
-    console.error('Error loading words:', error);
-  }
-};
+  };
 
   const generateWords = (sourceWords: string[]) => {
     const newWords: string[] = [];
@@ -143,34 +153,58 @@ export default function TypingTestPage() {
       newWords.push(sourceWords[randomIndex]);
     }
     setWords(newWords);
+    organizeIntoRows(newWords);
   };
 
-const loadLeaderboard = async () => {
-  try {
-    const response = await fetch(`${leaderboardApiUrl}/leaderboard/${language}`);
+  const organizeIntoRows = (wordsList: string[]) => {
+    const newRows: number[][] = [];
+    let currentRow: number[] = [];
     
-    // Check if response is OK and is JSON
-    if (!response.ok) {
-      console.log('Leaderboard not available yet (404)');
-      setLeaderboard([]);
-      return;
+    for (let i = 0; i < wordsList.length; i++) {
+      currentRow.push(i);
+      
+      if (currentRow.length === wordsPerRow) {
+        newRows.push([...currentRow]);
+        currentRow = [];
+      }
     }
     
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.log('Leaderboard returned non-JSON response');
-      setLeaderboard([]);
-      return;
+    if (currentRow.length > 0) {
+      while (currentRow.length < wordsPerRow) {
+        const randomIndex = Math.floor(Math.random() * allWords.length);
+        wordsList.push(allWords[randomIndex]);
+        currentRow.push(wordsList.length - 1);
+      }
+      newRows.push(currentRow);
     }
     
-    // Add type assertion here
-    const data = await response.json() as LeaderboardAPIResponse;
-    setLeaderboard(data.scores || []);
-  } catch (error) {
-    console.error('Error loading leaderboard:', error);
-    setLeaderboard([]);
-  }
-};
+    setRows(newRows);
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const response = await fetch(`${leaderboardApiUrl}/leaderboard/${language}`);
+      
+      if (!response.ok) {
+        console.log('Leaderboard not available yet');
+        setLeaderboard([]);
+        return;
+      }
+      
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.log('Leaderboard returned non-JSON response');
+        setLeaderboard([]);
+        return;
+      }
+      
+      const data = await response.json() as LeaderboardAPIResponse;
+      setLeaderboard(data.scores || []);
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+      setLeaderboard([]);
+    }
+  };
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -209,10 +243,17 @@ const loadLeaderboard = async () => {
       incorrectWords: !isCorrect ? prev.incorrectWords + 1 : prev.incorrectWords
     }));
 
+    const currentRowIndex = Math.floor(currentWordIndex / wordsPerRow);
+    
     setCurrentWordIndex(prev => prev + 1);
     setCurrentInput('');
 
-    // Generate more words if needed
+    const newRowIndex = Math.floor((currentWordIndex + 1) / wordsPerRow);
+    
+    if (newRowIndex > currentRowIndex && newRowIndex > currentVisibleRow) {
+      setCurrentVisibleRow(newRowIndex);
+    }
+
     if (currentWordIndex >= words.length - 50 && allWords.length > 0) {
       const newWords = [...words];
       for (let i = 0; i < 100; i++) {
@@ -220,17 +261,20 @@ const loadLeaderboard = async () => {
         newWords.push(allWords[randomIndex]);
       }
       setWords(newWords);
+      organizeIntoRows(newWords);
     }
 
-    // Remove animation after 300ms
     setTimeout(() => {
-      setTypedWords(prev => ({
-        ...prev,
-        [currentWordIndex]: {
-          ...prev[currentWordIndex],
-          justCompleted: false
+      setTypedWords(prev => {
+        const updated = { ...prev };
+        if (updated[currentWordIndex]) {
+          updated[currentWordIndex] = {
+            ...updated[currentWordIndex],
+            justCompleted: false
+          };
         }
-      }));
+        return updated;
+      });
     }, 300);
 
     updateStats();
@@ -296,6 +340,10 @@ const loadLeaderboard = async () => {
         alert('Score saved successfully! 🎉');
         loadLeaderboard();
         setPlayerName('');
+      } else {
+        const errorData = await response.json() as { error?: string };
+        console.error('Save error:', errorData);
+        alert(`Failed to save score: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error saving score:', error);
@@ -307,29 +355,43 @@ const loadLeaderboard = async () => {
     const typedWord = typedWords[index];
     
     if (index === currentWordIndex) {
+      // Current word being typed
       return (
-        <span key={index} className="inline-block mx-1 px-2 py-1 rounded-lg bg-slate-600/30 border-2 border-slate-500 text-white font-semibold transform scale-105">
+        <span 
+          key={index} 
+          className="inline-block px-2 py-0.5 rounded bg-slate-600/30 border-2 border-slate-500 text-white font-semibold transform scale-105"
+        >
           {renderCurrentWordChars(word)}
         </span>
       );
     } else if (typedWord) {
+      // Word has been typed
       if (typedWord.isCorrect) {
+        // CORRECT WORD - GREEN (no animation)
         return (
-          <span key={index} className={`inline-block mx-1 px-2 py-1 rounded-lg bg-green-500/20 text-green-400 font-semibold ${typedWord.justCompleted ? 'animate-pulse' : ''}`}>
+          <span 
+            key={index} 
+            className="inline-block px-2 py-0.5 rounded bg-green-500/20 text-green-400 font-semibold"
+          >
             {word}
           </span>
         );
       } else {
+        // INCORRECT WORD - RED with character details (no animation)
         return (
-          <span key={index} className={`inline-block mx-1 px-2 py-1 rounded-lg bg-red-500/20 border border-red-500/30 font-semibold ${typedWord.justCompleted ? 'animate-bounce' : ''}`}>
+          <span 
+            key={index} 
+            className="inline-block px-2 py-0.5 rounded bg-red-500/20 border border-red-500/30 font-semibold"
+          >
             {renderIncorrectWord(word, typedWord.original)}
           </span>
         );
       }
     }
     
+    // Not yet typed - GRAY
     return (
-      <span key={index} className="inline-block mx-1 px-2 py-1 text-gray-400">
+      <span key={index} className="inline-block px-2 py-0.5 text-gray-400 opacity-60">
         {word}
       </span>
     );
@@ -344,14 +406,19 @@ const loadLeaderboard = async () => {
           const typedChar = input[i] || '';
           
           if (i >= word.length) {
-            return <span key={i} className="text-red-400">{typedChar}</span>;
+            // Extra characters typed
+            return <span key={i} className="text-red-400 bg-red-500/20">{typedChar}</span>;
           } else if (i >= input.length) {
-            return i === input.length ? (
-              <span key={i}>{char}<span className="inline-block w-0.5 h-5 bg-slate-500 animate-pulse ml-1"></span></span>
-            ) : <span key={i}>{char}</span>;
+            // Not yet typed
+            if (i === input.length) {
+              return <span key={i}>{char}<span className="inline-block w-0.5 h-5 bg-slate-500 animate-pulse ml-0.5"></span></span>;
+            }
+            return <span key={i}>{char}</span>;
           } else if (typedChar === char) {
+            // Correct character
             return <span key={i} className="text-green-400">{char}</span>;
           } else {
+            // Wrong character
             return <span key={i} className="text-red-400 bg-red-500/20">{typedChar}</span>;
           }
         })}
@@ -367,15 +434,15 @@ const loadLeaderboard = async () => {
           const typedChar = typedWord[i] || '';
           
           if (typedChar === correctChar) {
-            return <span key={i} className="text-white">{typedChar}</span>;
+            return <span key={i} className="text-white font-bold">{typedChar}</span>;
           } else if (typedChar) {
-            return <span key={i} className="text-red-400">{typedChar}</span>;
+            return <span key={i} className="text-red-400 bg-red-500/30 px-0.5 rounded font-bold">{typedChar}</span>;
           } else {
-            return <span key={i} className="text-white opacity-40">{correctChar}</span>;
+            return <span key={i} className="text-white opacity-40 font-bold">{correctChar}</span>;
           }
         })}
         {typedWord.length > correctWord.length && (
-          <span className="text-red-400 line-through">{typedWord.slice(correctWord.length)}</span>
+          <span className="text-red-400 line-through decoration-2 font-bold">{typedWord.slice(correctWord.length)}</span>
         )}
       </>
     );
@@ -383,37 +450,38 @@ const loadLeaderboard = async () => {
 
   const getPerformanceMessage = () => {
     const { wpm, accuracy } = stats;
-    if (wpm >= 80 && accuracy >= 95) return { emoji: '🔥', text: 'LEGENDARY! You\'re a typing master!' };
-    if (wpm >= 60 && accuracy >= 90) return { emoji: '⭐', text: 'Excellent work! Keep it up!' };
-    if (wpm >= 40 && accuracy >= 85) return { emoji: '✨', text: 'Great job! You\'re improving!' };
-    if (wpm >= 20) return { emoji: '💫', text: 'Good start! Practice makes perfect!' };
-    return { emoji: '🌟', text: 'Keep practicing! You\'ll get better!' };
+    if (wpm >= 80 && accuracy >= 95) return 'LEGENDARY! You\'re a typing master!';
+    if (wpm >= 60 && accuracy >= 90) return 'Excellent work! Keep it up!';
+    if (wpm >= 40 && accuracy >= 85) return 'Great job! You\'re improving!';
+    if (wpm >= 20) return 'Good start! Practice makes perfect!';
+    return 'Keep practicing! You\'ll get better!';
   };
 
   if (!config) return null;
 
-  // Get visible words (show 30 words at a time)
-  const visibleWords = words.slice(currentWordIndex, currentWordIndex + 30);
+  const startRow = currentVisibleRow;
+  const endRow = Math.min(startRow + 3, rows.length);
+  const visibleRows = rows.slice(startRow, endRow);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       {/* Animated Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute w-96 h-96 bg-slate-700/10 rounded-full top-0 -left-48 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute w-96 h-96 bg-slate-600/10 rounded-full bottom-0 -right-48 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-        <div className="absolute w-96 h-96 bg-slate-800/10 rounded-full top-1/2 left-1/2 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '4s' }} />
+        <div className="absolute w-96 h-96 bg-purple-500/10 rounded-full top-0 -left-48 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute w-96 h-96 bg-blue-500/10 rounded-full bottom-0 -right-48 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+        <div className="absolute w-96 h-96 bg-indigo-500/10 rounded-full top-1/2 left-1/2 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '4s' }} />
       </div>
 
       <div className="relative">
         {/* Navigation */}
         <nav className="sticky top-0 z-50 px-4 md:px-6 pt-6">
           <div className="container mx-auto">
-            <div className="bg-slate-900/95 border border-slate-700/50 rounded-2xl px-4 md:px-6 py-3 flex justify-between items-center shadow-lg">
+            <div className="bg-slate-900/95 border border-slate-700/50 rounded-2xl px-4 md:px-6 py-3 flex justify-between items-center shadow-lg shadow-black/20">
               <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800 shadow-md">
                   <img src="/icon/meteoricon.png" alt="Typemeteor" className="w-6 h-6" />
                 </div>
-                <h1 className="text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">
+                <h1 className="text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-tight">
                   TYPEMETEOR
                 </h1>
               </Link>
@@ -425,7 +493,7 @@ const loadLeaderboard = async () => {
           </div>
         </nav>
 
-        <div className="container mx-auto px-4 md:px-6 py-6 md:py-8 max-w-5xl">
+        <div className="container mx-auto px-4 md:px-6 py-6 md:py-8 max-w-6xl">
           {/* Language Info */}
           <div className="text-center mb-6 md:mb-8">
             <div className="mb-3">
@@ -439,20 +507,26 @@ const loadLeaderboard = async () => {
 
           {/* Stats Bar */}
           <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
-            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl md:rounded-2xl p-4 md:p-6 text-center">
-              <div className="mb-2 text-4xl">⏱️</div>
+            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl md:rounded-2xl p-4 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all">
+              <div className="mb-2">
+                <img src="/icon/clock.png" alt="Time" className="w-10 h-10 md:w-12 md:h-12 mx-auto" />
+              </div>
               <div className="text-2xl md:text-4xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{stats.timeLeft}</div>
               <div className="text-xs md:text-sm text-gray-400 font-medium mt-1">Time Left</div>
             </div>
             
-            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl md:rounded-2xl p-4 md:p-6 text-center">
-              <div className="mb-2 text-4xl">⚡</div>
+            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl md:rounded-2xl p-4 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all">
+              <div className="mb-2">
+                <img src="/icon/wpm.png" alt="WPM" className="w-10 h-10 md:w-12 md:h-12 mx-auto" />
+              </div>
               <div className="text-2xl md:text-4xl font-black text-green-400">{stats.wpm}</div>
               <div className="text-xs md:text-sm text-gray-400 font-medium mt-1">WPM</div>
             </div>
             
-            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl md:rounded-2xl p-4 md:p-6 text-center">
-              <div className="mb-2 text-4xl">🎯</div>
+            <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl md:rounded-2xl p-4 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all">
+              <div className="mb-2">
+                <img src="/icon/accuracy.png" alt="Accuracy" className="w-10 h-10 md:w-12 md:h-12 mx-auto" />
+              </div>
               <div className="text-2xl md:text-4xl font-black text-yellow-400">{stats.accuracy}%</div>
               <div className="text-xs md:text-sm text-gray-400 font-medium mt-1">Accuracy</div>
             </div>
@@ -461,11 +535,44 @@ const loadLeaderboard = async () => {
           {!isFinished ? (
             // Test Area
             <div className="bg-slate-900/50 border border-slate-700/50 rounded-2xl md:rounded-3xl p-4 md:p-8">
-              {/* Words Display */}
-              <div className="mb-4 md:mb-6 p-4 md:p-6 bg-slate-800/50 rounded-xl md:rounded-2xl min-h-[160px] md:min-h-[200px]">
-                <div className="text-xl md:text-2xl leading-relaxed flex flex-wrap gap-2">
-                  {visibleWords.map((word, index) => renderWord(word, currentWordIndex + index))}
-                </div>
+              {/* Words Display with JUSTIFIED LAYOUT */}
+              <div className="mb-4 md:mb-6 p-6 md:p-8 bg-slate-800/50 rounded-xl md:rounded-2xl min-h-[220px] md:min-h-[260px] flex items-center justify-center overflow-hidden">
+                {wordsLoading ? (
+                  <div className="text-center">
+                    <div className="animate-spin inline-block w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mb-4" />
+                    <p className="text-gray-400">Loading words...</p>
+                  </div>
+                ) : visibleRows.length > 0 ? (
+                  <div className="w-full space-y-4">
+                    {visibleRows.map((rowIndices, rowIdx) => (
+                      <div 
+                        key={startRow + rowIdx} 
+                        className="flex justify-between items-center text-xl md:text-2xl font-medium leading-relaxed"
+                        style={{
+                          textAlign: 'justify',
+                          textJustify: 'inter-word'
+                        }}
+                      >
+                        {rowIndices.map((wordIndex, idx) => (
+                          <React.Fragment key={wordIndex}>
+                            {renderWord(words[wordIndex], wordIndex)}
+                            {idx < rowIndices.length - 1 && <span className="flex-grow min-w-[0.25rem]" />}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-red-400 mb-4">Failed to load words</p>
+                    <button 
+                      onClick={loadWords}
+                      className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
               </div>
               
               {/* Input Area */}
@@ -476,20 +583,34 @@ const loadLeaderboard = async () => {
                 onChange={handleInput}
                 onKeyDown={handleKeyDown}
                 placeholder="Start typing here..."
-                className="w-full p-4 md:p-5 text-lg md:text-xl bg-slate-800 border-2 border-slate-600 rounded-xl focus:outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-400/20 transition-all text-white placeholder-gray-500"
+                disabled={wordsLoading || words.length === 0}
+                className="w-full p-4 md:p-5 text-lg md:text-xl bg-slate-800 border-2 border-purple-500 rounded-xl focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-500/20 transition-all text-white placeholder-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 autoComplete="off"
                 autoFocus
               />
               
-              <div className="mt-3 md:mt-4 text-center text-gray-400 text-base md:text-lg">
-                {isActive ? 'Keep typing! Press SPACE after each word 🚀' : 'Start typing to begin the timer ⏱️'}
+              <div className="mt-3 md:mt-4 text-center text-gray-400 text-base md:text-lg flex items-center justify-center gap-2">
+                {wordsLoading ? (
+                  'Loading words...'
+                ) : isActive ? (
+                  <>
+                    Keep typing! Press SPACE after each word 
+                    <img src="/icon/rocket.png" alt="Rocket" className="w-5 h-5 inline-block" />
+                  </>
+                ) : (
+                  <>
+                    Start typing to begin the timer 
+                    <img src="/icon/clock.png" alt="Clock" className="w-5 h-5 inline-block" />
+                  </>
+                )}
               </div>
               
               <button
                 onClick={resetTest}
-                className="mt-4 md:mt-6 mx-auto flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-base md:text-lg rounded-xl shadow-xl transition-all duration-300 hover:scale-105"
+                disabled={wordsLoading}
+                className="mt-4 md:mt-6 mx-auto flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-base md:text-lg rounded-xl shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <span>🔄</span>
+                <img src="/icon/restart.png" alt="Restart" className="w-5 h-5" />
                 <span>Restart Test</span>
               </button>
             </div>
@@ -497,9 +618,7 @@ const loadLeaderboard = async () => {
             // Results Screen
             <div className="bg-slate-900/50 border border-slate-700/50 rounded-3xl p-6 md:p-10 text-center">
               <div className="mb-6">
-                <div className="w-20 h-20 md:w-24 md:h-24 mx-auto bg-slate-800 rounded-full flex items-center justify-center animate-bounce">
-                  <span className="text-5xl">🎉</span>
-                </div>
+                <img src="/icon/meteoricon.png" alt="Complete" className="w-20 h-20 md:w-24 md:h-24 mx-auto animate-bounce" />
               </div>
               <h2 className="text-3xl md:text-4xl font-black mb-2">
                 <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Test Complete!</span>
@@ -507,36 +626,36 @@ const loadLeaderboard = async () => {
               <p className="text-gray-400 mb-8 text-sm md:text-base">Here's how you performed</p>
               
               <div className="grid grid-cols-2 gap-3 md:gap-6 mb-8 md:mb-10 max-w-2xl mx-auto">
-                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl">
-                  <div className="mb-2 text-4xl">⚡</div>
+                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300">
+                  <img src="/icon/wpm.png" alt="WPM" className="w-12 h-12 mx-auto mb-3" />
                   <div className="text-4xl md:text-5xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent mb-2">{stats.wpm}</div>
                   <div className="text-gray-300 font-medium text-sm md:text-base">Words Per Minute</div>
                 </div>
                 
-                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl">
-                  <div className="mb-2 text-4xl">🎯</div>
+                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300">
+                  <img src="/icon/accuracy.png" alt="Accuracy" className="w-12 h-12 mx-auto mb-3" />
                   <div className="text-4xl md:text-5xl font-black text-green-400 mb-2">{stats.accuracy}%</div>
                   <div className="text-gray-300 font-medium text-sm md:text-base">Accuracy</div>
                 </div>
                 
-                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl">
-                  <div className="mb-2 text-4xl">✅</div>
+                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300">
+                  <img src="/icon/competition.png" alt="Correct" className="w-12 h-12 mx-auto mb-3" />
                   <div className="text-4xl md:text-5xl font-black text-yellow-400 mb-2">{stats.correctWords}</div>
                   <div className="text-gray-300 font-medium text-sm md:text-base">Correct Words</div>
                 </div>
                 
-                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl">
-                  <div className="mb-2 text-4xl">❌</div>
+                <div className="p-4 md:p-6 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300">
+                  <img src="/icon/analytics.png" alt="Wrong" className="w-12 h-12 mx-auto mb-3" />
                   <div className="text-4xl md:text-5xl font-black text-red-400 mb-2">{stats.incorrectWords}</div>
                   <div className="text-gray-300 font-medium text-sm md:text-base">Wrong Words</div>
                 </div>
               </div>
 
               {/* Performance Message */}
-              <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50">
-                <p className="text-lg md:text-xl font-bold text-white">
-                  {getPerformanceMessage().emoji} {getPerformanceMessage().text} {getPerformanceMessage().emoji}
-                </p>
+              <div className="mb-6 p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center gap-2">
+                <img src="/icon/competition.png" alt="Performance" className="w-5 h-5" />
+                <p className="text-lg md:text-xl font-bold text-white">{getPerformanceMessage()}</p>
+                <img src="/icon/competition.png" alt="Performance" className="w-5 h-5" />
               </div>
 
               {/* Save Score */}
@@ -550,24 +669,27 @@ const loadLeaderboard = async () => {
                 />
                 <button
                   onClick={saveScore}
-                  className="w-full px-6 py-3 md:py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-base md:text-lg rounded-xl shadow-xl transition-all duration-300 hover:scale-105"
+                  className="w-full px-6 py-3 md:py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-base md:text-lg rounded-xl shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 mx-auto"
                 >
-                  💾 Save Score to Leaderboard
+                  <img src="/icon/leaderboard.png" alt="Save" className="w-5 h-5" />
+                  Save Score to Leaderboard
                 </button>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <button
                   onClick={resetTest}
-                  className="px-8 md:px-10 py-3 md:py-4 bg-slate-700 hover:bg-slate-600 text-white text-base md:text-lg font-bold rounded-xl shadow-xl transition-all duration-300 hover:scale-105"
+                  className="px-8 md:px-10 py-3 md:py-4 bg-slate-700 hover:bg-slate-600 text-white text-base md:text-lg font-bold rounded-xl shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2"
                 >
-                  🔄 Try Again
+                  <img src="/icon/restart.png" alt="Restart" className="w-5 h-5" />
+                  Try Again
                 </button>
                 <Link
                   href="/"
-                  className="px-8 md:px-10 py-3 md:py-4 bg-slate-800 border border-slate-700 text-white text-base md:text-lg font-bold rounded-xl hover:bg-slate-700 hover:scale-105 transition-all duration-300 inline-block text-center"
+                  className="px-8 md:px-10 py-3 md:py-4 bg-slate-800 border border-slate-700 text-white text-base md:text-lg font-bold rounded-xl hover:bg-slate-700 hover:scale-105 transition-all duration-300 inline-flex items-center justify-center gap-2"
                 >
-                  🏠 Back to Home
+                  <img src="/icon/meteoricon.png" alt="Home" className="w-5 h-5" />
+                  Back to Home
                 </Link>
               </div>
             </div>
@@ -576,7 +698,7 @@ const loadLeaderboard = async () => {
           {/* Leaderboard */}
           <div className="mt-8 md:mt-10 bg-slate-900/50 border border-slate-700/50 rounded-2xl md:rounded-3xl p-4 md:p-8">
             <h3 className="text-2xl md:text-3xl font-black mb-4 md:mb-6 text-center flex items-center justify-center gap-2 md:gap-3 flex-wrap">
-              <span className="text-3xl">🏆</span>
+              <img src="/icon/leaderboard.png" alt="Leaderboard" className="w-8 h-8 md:w-10 md:h-10" />
               <span className="text-sm md:text-base">Leaderboard - <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{config.name}</span></span>
             </h3>
             <div className="space-y-2 md:space-y-3">
@@ -586,7 +708,7 @@ const loadLeaderboard = async () => {
                     key={index}
                     className={`flex items-center justify-between p-3 md:p-4 ${
                       index < 3 ? 'bg-slate-800/50 border-slate-600' : 'bg-slate-900/30 border-slate-700/30'
-                    } border rounded-xl hover:scale-[1.02] transition-transform`}
+                    } border rounded-xl hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300`}
                   >
                     <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
                       <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center font-black text-lg md:text-2xl shrink-0">

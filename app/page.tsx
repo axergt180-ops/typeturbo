@@ -88,8 +88,8 @@ export default function Homepage() {
         onClick={() => selectLanguage(code)}
         className={`rounded-2xl p-8 text-center cursor-pointer relative group transition-all duration-300
           ${selectedLanguage === code 
-            ? 'bg-slate-800/80 border-2 border-white/40 shadow-2xl ring-4 ring-white/20 transform -translate-y-2 scale-105' 
-            : 'bg-slate-900/40 border border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600 hover:-translate-y-1 hover:scale-102'
+            ? 'bg-slate-800/60 border-2 border-slate-600/80 transform -translate-y-1' 
+            : 'bg-slate-900/40 border border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600 hover:-translate-y-1'
           }`}
       >
         <div className="mb-4 transform transition-transform group-hover:scale-110">
@@ -98,7 +98,7 @@ export default function Homepage() {
         <h4 className="text-xl font-bold mb-2 group-hover:text-gray-300 transition-colors text-white">{name}</h4>
         <p className="text-sm text-gray-400">{native}</p>
         {selectedLanguage === code && (
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-900 font-bold shadow-xl animate-in zoom-in duration-300">
+          <div className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-900 font-bold shadow-lg">
             <span className="text-xl">✓</span>
           </div>
         )}
