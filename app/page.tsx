@@ -273,8 +273,8 @@ export default function Homepage() {
                 <img src="/icon/left-arrow.png" alt="Previous" className="w-6 h-6" />
               </button>
 
-              {/* Language Grid Container */}
-              <div className="overflow-hidden">
+              {/* Language Grid Container with padding for selected card effect */}
+              <div className="overflow-hidden py-2">
                 <div 
                   className="flex transition-transform duration-500 ease-in-out"
                   style={{ transform: `translateX(-${currentPage * 100}%)` }}

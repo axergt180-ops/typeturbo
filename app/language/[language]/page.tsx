@@ -127,7 +127,15 @@ export default function TypingTestPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const data = await response.json() as Record<string, string[]>;
+      // Try to parse as JSON directly (GitHub raw doesn't always set content-type header)
+      let data: Record<string, string[]>;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse JSON:', jsonError);
+        throw new Error('Invalid JSON response from server');
+      }
+      
       const languageWords = data[language];
       
       if (languageWords && Array.isArray(languageWords) && languageWords.length > 0) {
@@ -137,12 +145,24 @@ export default function TypingTestPage() {
         setWordsLoading(false);
       } else {
         console.error('No words found for language:', language);
-        setWordsLoading(false);
+        throw new Error(`No words available for ${language}`);
       }
     } catch (error) {
       console.error('Error loading words:', error);
       setWordsLoading(false);
-      alert('Failed to load words. Please refresh the page.');
+      
+      // More specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('JSON')) {
+          alert('Failed to load word database. The data format is invalid. Please contact support.');
+        } else if (error.message.includes('HTTP')) {
+          alert('Failed to connect to word database. Please check your internet connection.');
+        } else {
+          alert(`Failed to load words: ${error.message}`);
+        }
+      } else {
+        alert('Failed to load words. Please refresh the page and try again.');
+      }
     }
   };
 
@@ -183,7 +203,12 @@ export default function TypingTestPage() {
 
   const loadLeaderboard = async () => {
     try {
-      const response = await fetch(`${leaderboardApiUrl}/leaderboard/${language}`);
+      // Use production API URL in development if needed
+      const apiUrl = leaderboardApiUrl.includes('localhost') 
+        ? 'https://typemeteor.com/api' 
+        : leaderboardApiUrl;
+
+      const response = await fetch(`${apiUrl}/leaderboard/${language}`);
       
       if (!response.ok) {
         console.log('Leaderboard not available yet');
@@ -325,11 +350,18 @@ export default function TypingTestPage() {
     }
 
     try {
-      const response = await fetch(`${leaderboardApiUrl}/leaderboard`, {
+      // Use production API URL in development if needed
+      const apiUrl = leaderboardApiUrl.includes('localhost') 
+        ? 'https://typemeteor.com/api' 
+        : leaderboardApiUrl;
+
+      const response = await fetch(`${apiUrl}/leaderboard`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          name: playerName,
+          name: playerName.trim(),
           wpm: stats.wpm,
           accuracy: stats.accuracy,
           language: language
@@ -338,16 +370,22 @@ export default function TypingTestPage() {
 
       if (response.ok) {
         alert('Score saved successfully! 🎉');
-        loadLeaderboard();
+        await loadLeaderboard();
         setPlayerName('');
       } else {
-        const errorData = await response.json() as { error?: string };
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
         console.error('Save error:', errorData);
-        alert(`Failed to save score: ${errorData.error || 'Unknown error'}`);
+        alert(`Failed to save score: ${errorData.error || 'Server error'}`);
       }
     } catch (error) {
       console.error('Error saving score:', error);
-      alert('Failed to save score. Please try again.');
+      
+      // More helpful error message
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        alert('Network error: Unable to connect to leaderboard server. Please check your internet connection and try again.');
+      } else {
+        alert('Failed to save score. Please try again later.');
+      }
     }
   };
 
@@ -536,14 +574,14 @@ export default function TypingTestPage() {
             // Test Area
             <div className="bg-slate-900/50 border border-slate-700/50 rounded-2xl md:rounded-3xl p-4 md:p-8">
               {/* Words Display with JUSTIFIED LAYOUT */}
-              <div className="mb-4 md:mb-6 p-6 md:p-8 bg-slate-800/50 rounded-xl md:rounded-2xl min-h-[220px] md:min-h-[260px] flex items-center justify-center overflow-hidden">
+              <div className="mb-4 md:mb-6 p-6 md:p-8 bg-slate-800/50 rounded-xl md:rounded-2xl min-h-[280px] md:min-h-[320px] flex items-center justify-center overflow-hidden">
                 {wordsLoading ? (
                   <div className="text-center">
-                    <div className="animate-spin inline-block w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mb-4" />
+                    <div className="animate-spin inline-block w-8 h-8 border-4 border-slate-600 border-t-transparent rounded-full mb-4" />
                     <p className="text-gray-400">Loading words...</p>
                   </div>
                 ) : visibleRows.length > 0 ? (
-                  <div className="w-full space-y-4">
+                  <div className="w-full space-y-5">
                     {visibleRows.map((rowIndices, rowIdx) => (
                       <div 
                         key={startRow + rowIdx} 
@@ -563,13 +601,18 @@ export default function TypingTestPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center">
-                    <p className="text-red-400 mb-4">Failed to load words</p>
+                  <div className="text-center max-w-md mx-auto">
+                    <div className="mb-4">
+                      <img src="/icon/analytics.png" alt="Error" className="w-16 h-16 mx-auto opacity-50" />
+                    </div>
+                    <p className="text-red-400 mb-2 font-semibold text-lg">Failed to load words</p>
+                    <p className="text-gray-400 text-sm mb-6">Please check your internet connection and try again</p>
                     <button 
                       onClick={loadWords}
-                      className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all"
+                      className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all hover:scale-105 flex items-center gap-2 mx-auto shadow-lg"
                     >
-                      Retry
+                      <img src="/icon/restart.png" alt="Retry" className="w-5 h-5" />
+                      <span>Retry Loading</span>
                     </button>
                   </div>
                 )}
