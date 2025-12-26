@@ -10,7 +10,7 @@ export default function StructuredData({ language }: StructuredDataProps) {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
     name: 'Typemeteor',
-    url: 'https://typemeteor.sbs',
+    url: 'https://typemeteor.com',
     description: 'Free online typing speed test in 17 languages. Measure your WPM, track your progress, and compete with typists worldwide.',
     applicationCategory: 'EducationalApplication',
     operatingSystem: 'Any',
@@ -33,8 +33,8 @@ export default function StructuredData({ language }: StructuredDataProps) {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'Typemeteor',
-    url: 'https://typemeteor.sbs',
-    logo: 'https://typemeteor.sbs/icon/meteoricon.png',
+    url: 'https://typemeteor.com',
+    logo: 'https://typemeteor.com/icon/meteoricon.png',
     sameAs: [
       // Tambahkan social media links jika ada
     ]
@@ -48,13 +48,13 @@ export default function StructuredData({ language }: StructuredDataProps) {
         '@type': 'ListItem',
         position: 1,
         name: 'Home',
-        item: 'https://typemeteor.sbs'
+        item: 'https://typemeteor.com'
       },
       {
         '@type': 'ListItem',
         position: 2,
         name: `${language.charAt(0).toUpperCase() + language.slice(1)} Typing Test`,
-        item: `https://typemeteor.sbs/language/${language}`
+        item: `https://typemeteor.com/language/${language}`
       }
     ]
   } : null;

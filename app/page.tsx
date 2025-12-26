@@ -197,60 +197,61 @@ export default function Homepage() {
   };
 
   const selectLanguage = (lang: string) => {
-    if (selectedLanguage === lang) {
-      setSelectedLanguage(null);
-    } else {
-      setSelectedLanguage(lang);
-    }
+    // Always select on first click
+    setSelectedLanguage(lang);
   };
 
   const LanguageCard: React.FC<LanguageCardProps> = ({ code, name, native, flag }) => {
     const isSelected = selectedLanguage === code;
-    const isHovered = hoveredCard === code;
+    const isHovered = hoveredCard === code && !isSelected; // Don't hover if selected
     
     return (
       <div
         onClick={() => selectLanguage(code)}
-        onMouseEnter={() => setHoveredCard(code)}
+        onMouseEnter={() => !isSelected && setHoveredCard(code)} // Only hover if not selected
         onMouseLeave={() => setHoveredCard(null)}
-        className={`p-8 text-center cursor-pointer relative group transition-all duration-300 clip-corner overflow-hidden
+        className={`p-6 md:p-8 text-center cursor-pointer relative group transition-all duration-200 clip-corner overflow-hidden
           ${isSelected 
-            ? 'bg-slate-800/80 border-2 border-slate-400 transform -translate-y-2 shadow-[0_0_30px_rgba(148,163,184,0.3)]' 
-            : 'bg-slate-900/40 border border-slate-700/50 hover:bg-slate-800/60 hover:border-slate-500 hover:-translate-y-1'
+            ? 'bg-slate-800/90 border-2 border-slate-400 shadow-[0_0_40px_rgba(148,163,184,0.4)]' 
+            : isHovered
+            ? 'bg-slate-800/60 border border-slate-500 -translate-y-1'
+            : 'bg-slate-900/40 border border-slate-700/50'
           }`}
       >
-        {/* Scan line effect on hover */}
+        {/* Scan line effect only on hover, not on selected */}
         {isHovered && (
           <div className="absolute inset-0 pointer-events-none">
             <div className="absolute w-full h-[2px] bg-gradient-to-r from-transparent via-slate-400 to-transparent scan-line"></div>
           </div>
         )}
         
-        {/* Glow effect */}
+        {/* Static glow for selected */}
         {isSelected && (
           <div className="absolute inset-0 bg-gradient-to-br from-slate-600/20 via-transparent to-slate-600/20 pointer-events-none"></div>
         )}
         
-        <div className={`mb-4 transform transition-all duration-300 ${isHovered ? 'scale-125 rotate-3' : isSelected ? 'scale-110' : ''}`}>
-          <img src={flag} alt={`${name} Flag`} className="w-20 h-20 mx-auto object-contain" />
+        <div className={`mb-3 md:mb-4 transform transition-all duration-200 ${isSelected ? 'scale-105' : isHovered ? 'scale-110' : 'scale-100'}`}>
+          <img src={flag} alt={`${name} Flag`} className="w-16 h-16 md:w-20 md:h-20 mx-auto object-contain" />
         </div>
         
-        <h4 className={`text-xl font-bold mb-2 transition-all duration-300 ${isHovered ? 'text-white scale-105' : 'text-gray-200'}`}>
+        <h4 className={`text-lg md:text-xl font-bold mb-1 md:mb-2 transition-colors duration-200 ${isSelected ? 'text-white' : isHovered ? 'text-white' : 'text-gray-200'}`}>
           {name}
         </h4>
         
-        <p className={`text-sm uppercase tracking-wider transition-colors duration-300 ${isHovered ? 'text-gray-300' : 'text-gray-400'}`}>
+        <p className={`text-xs md:text-sm uppercase tracking-wider transition-colors duration-200 ${isSelected ? 'text-gray-300' : isHovered ? 'text-gray-300' : 'text-gray-400'}`}>
           {native}
         </p>
         
         {isSelected && (
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white flex items-center justify-center text-slate-900 font-bold shadow-lg clip-corner-sm animate-bounce">
-            <span className="text-xl">✓</span>
+          <div className="absolute top-2 right-2 md:top-3 md:right-3 w-8 h-8 md:w-10 md:h-10 bg-white flex items-center justify-center text-slate-900 font-bold shadow-lg clip-corner-sm">
+            <span className="text-lg md:text-xl">✓</span>
           </div>
         )}
         
-        {/* Corner accent */}
-        <div className={`absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 transition-colors duration-300 ${isSelected ? 'border-slate-400' : isHovered ? 'border-slate-500' : 'border-transparent'}`}></div>
+        {/* Corner accent - only show on selected */}
+        {isSelected && (
+          <div className="absolute top-0 right-0 w-6 h-6 md:w-8 md:h-8 border-t-2 border-r-2 border-slate-400"></div>
+        )}
       </div>
     );
   };
@@ -304,7 +305,7 @@ export default function Homepage() {
         
         @keyframes scanline {
           0% { transform: translateY(-100%); opacity: 0; }
-          50% { opacity: 1; }
+          50% { opacity: 0.5; }
           100% { transform: translateY(200%); opacity: 0; }
         }
         .scan-line {
@@ -379,15 +380,6 @@ export default function Homepage() {
         }
         .rotate-in { animation: rotateIn 0.5s ease-out; }
         
-        /* Tab slide indicator */
-        .tab-indicator {
-          position: absolute;
-          bottom: 0;
-          height: 4px;
-          background: linear-gradient(90deg, transparent, rgb(148 163 184), transparent);
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
         /* Number counter effect */
         @keyframes countUp {
           from { opacity: 0; transform: translateY(20px) scale(0.5); }
@@ -408,7 +400,7 @@ export default function Homepage() {
       `}</style>
 
       <div className="relative">
-        {/* Navigation with parallax effect */}
+        {/* Navigation - NO FLOAT ON LOGO */}
         <nav className="sticky top-0 z-50 px-4 md:px-6 pt-6 backdrop-blur-sm">
           <div className="container mx-auto">
             <div className="bg-slate-900/95 border-b-2 border-slate-700/50 px-4 md:px-6 py-3 flex justify-between items-center shadow-lg shadow-black/20 clip-corner pulse-glow">
@@ -416,7 +408,7 @@ export default function Homepage() {
                 <div className="w-10 h-10 flex items-center justify-center bg-slate-800 shadow-md clip-corner-sm">
                   <img src="/icon/meteoricon.png" alt="Typemeteor Icon" className="w-6 h-6" />
                 </div>
-                <h1 className="text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-[0.2em] glitch">
+                <h1 className="text-xl md:text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-[0.2em] glitch">
                   TYPEMETEOR
                 </h1>
               </div>
@@ -654,7 +646,7 @@ export default function Homepage() {
           </div>
         </section>
 
-        {/* Leaderboard Section with Slide Navigation */}
+        {/* Leaderboard Section with Dropdown */}
         <section id="leaderboard" className="py-24 px-6 bg-linear-to-b from-slate-900/50 to-transparent">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16 fade-in-up">
@@ -702,8 +694,8 @@ export default function Homepage() {
                   </button>
                   
                   {showLanguageDropdown && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[600px] bg-slate-900/95 border-2 border-slate-700 shadow-xl z-50 clip-corner backdrop-blur-sm">
-                      <div className="grid grid-cols-3 gap-1 p-2">
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[90vw] max-w-[600px] bg-slate-900/98 border-2 border-slate-700 shadow-xl z-50 clip-corner backdrop-blur-sm max-h-[400px] overflow-y-auto">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-1 p-2">
                         {languageTabs.map((tab) => (
                           <button
                             key={tab}
@@ -711,7 +703,7 @@ export default function Homepage() {
                               setActiveLeaderboardTab(tab);
                               setShowLanguageDropdown(false);
                             }}
-                            className={`px-4 py-3 text-center hover:bg-slate-800/70 transition-all uppercase tracking-wider text-sm font-semibold border-l-4 bg-slate-900/95 clip-corner-sm ${
+                            className={`px-3 py-3 text-center hover:bg-slate-800/70 transition-all uppercase tracking-wider text-xs md:text-sm font-semibold border-l-4 bg-slate-900/95 clip-corner-sm ${
                               activeLeaderboardTab === tab 
                                 ? 'border-slate-400 text-white bg-slate-800/50' 
                                 : 'border-transparent text-gray-300 hover:border-slate-600'
@@ -743,7 +735,7 @@ export default function Homepage() {
               </div>
             </div>
 
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-8 clip-corner-lg">
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-6 md:p-8 clip-corner-lg">
               {loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin inline-block w-12 h-12 border-4 border-slate-600 border-t-slate-400 mb-4"></div>
@@ -754,18 +746,18 @@ export default function Homepage() {
                   {leaderboard.slice(0, 10).map((score: LeaderboardEntry, i: number) => (
                     <div
                       key={i}
-                      className={`flex items-center justify-between p-5 border-l-4 transition-all duration-300 clip-corner interactive-card group fade-in-up stagger-${i + 1}
+                      className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:p-5 border-l-4 transition-all duration-300 clip-corner interactive-card group fade-in-up stagger-${i + 1}
                         ${i < 3 ? 'bg-slate-800/60 border-slate-400' : 'bg-slate-900/30 border-slate-700/30'} 
                         hover:bg-slate-700/40 hover:border-slate-500 hover:-translate-y-1 hover:shadow-lg`}
                     >
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className={`w-12 h-12 flex items-center justify-center font-black text-2xl shrink-0 clip-corner-sm transition-all duration-300 count-up
+                      <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0 w-full md:w-auto mb-3 md:mb-0">
+                        <div className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-black text-xl md:text-2xl shrink-0 clip-corner-sm transition-all duration-300 count-up
                           ${i < 3 ? 'bg-slate-700 group-hover:scale-110 group-hover:rotate-6' : 'bg-slate-800 group-hover:scale-105'}`}
                         >
                           {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="font-bold text-lg text-white truncate uppercase tracking-wide group-hover:text-slate-200 transition-colors">
+                          <div className="font-bold text-base md:text-lg text-white truncate uppercase tracking-wide group-hover:text-slate-200 transition-colors">
                             {score.name}
                           </div>
                           <div className="text-xs text-gray-400 uppercase tracking-wider">
@@ -773,15 +765,15 @@ export default function Homepage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-8 items-center shrink-0">
+                      <div className="flex gap-6 md:gap-8 items-center shrink-0 w-full md:w-auto justify-end">
                         <div className="text-center">
-                          <div className="font-black text-2xl bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent count-up">
+                          <div className="font-black text-xl md:text-2xl bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent count-up">
                             {score.wpm}
                           </div>
-                          <div className="text-xs text-gray-400 uppercase tracking-wider">{activeLeaderboardTab === 'overall' ? 'Total WPM' : 'WPM'}</div>
+                          <div className="text-xs text-gray-400 uppercase tracking-wider">{activeLeaderboardTab === 'overall' ? 'Total' : 'WPM'}</div>
                         </div>
                         <div className="text-center">
-                          <div className="font-black text-xl text-emerald-400 count-up">{score.accuracy}%</div>
+                          <div className="font-black text-lg md:text-xl text-emerald-400 count-up">{score.accuracy}%</div>
                           <div className="text-xs text-gray-400 uppercase tracking-wider">ACC</div>
                         </div>
                       </div>
@@ -795,22 +787,22 @@ export default function Homepage() {
             
             {/* Stats Summary */}
             {!loading && leaderboard.length > 0 && (
-              <div className="mt-8 grid grid-cols-3 gap-4 fade-in-up">
-                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
-                  <div className="text-2xl font-black text-white count-up">{leaderboard.length}</div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wider">Total Players</div>
+              <div className="mt-8 grid grid-cols-3 gap-3 md:gap-4 fade-in-up">
+                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
+                  <div className="text-xl md:text-2xl font-black text-white count-up">{leaderboard.length}</div>
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">Players</div>
                 </div>
-                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
-                  <div className="text-2xl font-black text-emerald-400 count-up">
+                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
+                  <div className="text-xl md:text-2xl font-black text-emerald-400 count-up">
                     {leaderboard.length > 0 ? Math.max(...leaderboard.map(s => s.wpm)) : 0}
                   </div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wider">Top {activeLeaderboardTab === 'overall' ? 'Total ' : ''}WPM</div>
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">Top {activeLeaderboardTab === 'overall' ? 'Total' : 'WPM'}</div>
                 </div>
-                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
-                  <div className="text-2xl font-black text-yellow-400 count-up">
+                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
+                  <div className="text-xl md:text-2xl font-black text-yellow-400 count-up">
                     {leaderboard.length > 0 ? Math.max(...leaderboard.map(s => s.accuracy)) : 0}%
                   </div>
-                  <div className="text-xs text-gray-400 uppercase tracking-wider">Best Accuracy</div>
+                  <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">Best ACC</div>
                 </div>
               </div>
             )}
