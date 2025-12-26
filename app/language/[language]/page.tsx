@@ -115,7 +115,7 @@ export default function TypingTestPage() {
     };
   }, [isActive, stats.timeLeft]);
 
-  const leaderboardApiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL || 'https://typemeteor.com/api';
+  const leaderboardApiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL || 'https://typemeteor.sbs/api';
 
   const loadWords = async () => {
     try {
@@ -203,12 +203,7 @@ export default function TypingTestPage() {
 
   const loadLeaderboard = async () => {
     try {
-      // Use production API URL in development if needed
-      const apiUrl = leaderboardApiUrl.includes('localhost') 
-        ? 'https://typemeteor.com/api' 
-        : leaderboardApiUrl;
-
-      const response = await fetch(`${apiUrl}/leaderboard/${language}`);
+      const response = await fetch(`${leaderboardApiUrl}/leaderboard/${language}`);
       
       if (!response.ok) {
         console.log('Leaderboard not available yet');
@@ -350,12 +345,7 @@ export default function TypingTestPage() {
     }
 
     try {
-      // Use production API URL in development if needed
-      const apiUrl = leaderboardApiUrl.includes('localhost') 
-        ? 'https://typemeteor.com/api' 
-        : leaderboardApiUrl;
-
-      const response = await fetch(`${apiUrl}/leaderboard`, {
+      const response = await fetch(`${leaderboardApiUrl}/leaderboard`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

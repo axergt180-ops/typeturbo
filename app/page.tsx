@@ -9,6 +9,7 @@ interface LeaderboardEntry {
   language: string;
   wpm: number;
   accuracy: number;
+  timestamp: string;
 }
 
 interface LanguageCardProps {
@@ -24,11 +25,15 @@ export default function Homepage() {
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
+  const [activeLeaderboardTab, setActiveLeaderboardTab] = useState<string>('overall');
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState<boolean>(false);
   
   const totalPages = 3;
 
   const languageNames: Record<string, string> = {
+    'overall': 'Overall',
     'indonesian': 'Indonesian',
     'english': 'English',
     'spanish': 'Spanish',
@@ -48,22 +53,139 @@ export default function Homepage() {
     'hindi': 'Hindi'
   };
 
+  // All 17 languages + overall
+  const languageTabs = [
+    'overall',
+    'indonesian',
+    'english',
+    'spanish',
+    'french',
+    'german',
+    'portuguese',
+    'japanese',
+    'italian',
+    'russian',
+    'korean',
+    'chinese',
+    'arabic',
+    'dutch',
+    'turkish',
+    'thai',
+    'vietnamese',
+    'hindi'
+  ];
+
   useEffect(() => {
-    loadLeaderboard();
+    loadLeaderboard(activeLeaderboardTab);
+  }, [activeLeaderboardTab]);
+
+  // Track mouse position for interactive effects
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  const loadLeaderboard = async () => {
-  try {
-    const apiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL;
-    const response = await fetch(`${apiUrl}/leaderboard?limit=8`);
-    const data = await response.json() as { leaderboard?: any[] };
-    setLeaderboard(data.leaderboard || []);
-    setLoading(false);
-  } catch (error) {
-    console.error('Error loading leaderboard:', error);
-    setLoading(false);
-  }
-};
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (showLanguageDropdown && !target.closest('.language-dropdown-container')) {
+        setShowLanguageDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLanguageDropdown]);
+
+  const loadLeaderboard = async (tab: string) => {
+    try {
+      setLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL || 'https://typemeteor.sbs/api';
+      
+      if (tab === 'overall') {
+        // Fetch all language leaderboards and aggregate
+        const languages = [
+          'indonesian', 'english', 'spanish', 'french', 'german', 'portuguese',
+          'japanese', 'italian', 'russian', 'korean', 'chinese', 'arabic',
+          'dutch', 'turkish', 'thai', 'vietnamese', 'hindi'
+        ];
+        
+        const allScores: { [key: string]: LeaderboardEntry[] } = {};
+        
+        // Fetch all language leaderboards
+        for (const lang of languages) {
+          try {
+            const response = await fetch(`${apiUrl}/leaderboard/${lang}`);
+            if (response.ok) {
+              const data = await response.json() as { leaderboard?: LeaderboardEntry[], scores?: LeaderboardEntry[] };
+              allScores[lang] = data.leaderboard || data.scores || [];
+            }
+          } catch (error) {
+            console.error(`Error loading ${lang} leaderboard:`, error);
+          }
+        }
+        
+        // Aggregate scores by player name
+        const playerTotals: { [key: string]: { name: string, totalWpm: number, count: number, bestAccuracy: number, languages: string[] } } = {};
+        
+        Object.entries(allScores).forEach(([lang, scores]) => {
+          scores.forEach(score => {
+            if (!playerTotals[score.name]) {
+              playerTotals[score.name] = {
+                name: score.name,
+                totalWpm: 0,
+                count: 0,
+                bestAccuracy: 0,
+                languages: []
+              };
+            }
+            playerTotals[score.name].totalWpm += score.wpm;
+            playerTotals[score.name].count += 1;
+            playerTotals[score.name].bestAccuracy = Math.max(playerTotals[score.name].bestAccuracy, score.accuracy);
+            if (!playerTotals[score.name].languages.includes(lang)) {
+              playerTotals[score.name].languages.push(lang);
+            }
+          });
+        });
+        
+        // Convert to leaderboard format and sort by total WPM
+        const aggregatedLeaderboard: LeaderboardEntry[] = Object.values(playerTotals)
+          .map(player => ({
+            name: player.name,
+            language: `${player.count} ${player.count === 1 ? 'language' : 'languages'}`,
+            wpm: player.totalWpm,
+            accuracy: player.bestAccuracy,
+            timestamp: new Date().toISOString()
+          }))
+          .sort((a, b) => b.wpm - a.wpm)
+          .slice(0, 10);
+        
+        setLeaderboard(aggregatedLeaderboard);
+        setLoading(false);
+        return;
+      } else {
+        const url = `${apiUrl}/leaderboard/${tab}`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          setLeaderboard([]);
+          setLoading(false);
+          return;
+        }
+        
+        const data = await response.json() as { leaderboard?: LeaderboardEntry[], scores?: LeaderboardEntry[] };
+        setLeaderboard(data.leaderboard || data.scores || []);
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+      setLeaderboard([]);
+      setLoading(false);
+    }
+  };
 
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -82,63 +204,233 @@ export default function Homepage() {
     }
   };
 
-  const LanguageCard: React.FC<LanguageCardProps> = ({ code, name, native, flag, page }) => {
+  const LanguageCard: React.FC<LanguageCardProps> = ({ code, name, native, flag }) => {
+    const isSelected = selectedLanguage === code;
+    const isHovered = hoveredCard === code;
+    
     return (
       <div
         onClick={() => selectLanguage(code)}
-        className={`rounded-2xl p-8 text-center cursor-pointer relative group transition-all duration-300
-          ${selectedLanguage === code 
-            ? 'bg-slate-800/60 border-2 border-slate-600/80 transform -translate-y-1' 
-            : 'bg-slate-900/40 border border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600 hover:-translate-y-1'
+        onMouseEnter={() => setHoveredCard(code)}
+        onMouseLeave={() => setHoveredCard(null)}
+        className={`p-8 text-center cursor-pointer relative group transition-all duration-300 clip-corner overflow-hidden
+          ${isSelected 
+            ? 'bg-slate-800/80 border-2 border-slate-400 transform -translate-y-2 shadow-[0_0_30px_rgba(148,163,184,0.3)]' 
+            : 'bg-slate-900/40 border border-slate-700/50 hover:bg-slate-800/60 hover:border-slate-500 hover:-translate-y-1'
           }`}
       >
-        <div className="mb-4 transform transition-transform group-hover:scale-110">
+        {/* Scan line effect on hover */}
+        {isHovered && (
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute w-full h-[2px] bg-gradient-to-r from-transparent via-slate-400 to-transparent scan-line"></div>
+          </div>
+        )}
+        
+        {/* Glow effect */}
+        {isSelected && (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-600/20 via-transparent to-slate-600/20 pointer-events-none"></div>
+        )}
+        
+        <div className={`mb-4 transform transition-all duration-300 ${isHovered ? 'scale-125 rotate-3' : isSelected ? 'scale-110' : ''}`}>
           <img src={flag} alt={`${name} Flag`} className="w-20 h-20 mx-auto object-contain" />
         </div>
-        <h4 className="text-xl font-bold mb-2 group-hover:text-gray-300 transition-colors text-white">{name}</h4>
-        <p className="text-sm text-gray-400">{native}</p>
-        {selectedLanguage === code && (
-          <div className="absolute top-3 right-3 w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-900 font-bold shadow-lg">
+        
+        <h4 className={`text-xl font-bold mb-2 transition-all duration-300 ${isHovered ? 'text-white scale-105' : 'text-gray-200'}`}>
+          {name}
+        </h4>
+        
+        <p className={`text-sm uppercase tracking-wider transition-colors duration-300 ${isHovered ? 'text-gray-300' : 'text-gray-400'}`}>
+          {native}
+        </p>
+        
+        {isSelected && (
+          <div className="absolute top-3 right-3 w-10 h-10 bg-white flex items-center justify-center text-slate-900 font-bold shadow-lg clip-corner-sm animate-bounce">
             <span className="text-xl">✓</span>
           </div>
         )}
+        
+        {/* Corner accent */}
+        <div className={`absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 transition-colors duration-300 ${isSelected ? 'border-slate-400' : isHovered ? 'border-slate-500' : 'border-transparent'}`}></div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      {/* Animated Background */}
+    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
+      {/* Animated Background with mouse-following effect */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute w-96 h-96 bg-slate-700/10 rounded-full top-0 -left-48 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute w-96 h-96 bg-slate-600/10 rounded-full bottom-0 -right-48 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
-        <div className="absolute w-96 h-96 bg-slate-800/10 rounded-full top-1/2 left-1/2 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '4s' }} />
+        <div 
+          className="absolute w-96 h-96 bg-slate-700/10 blur-3xl animate-pulse transition-transform duration-1000" 
+          style={{ 
+            animationDuration: '8s',
+            transform: `translate(${mousePosition.x / 50}px, ${mousePosition.y / 50}px)`,
+            top: 0,
+            left: '-12rem'
+          }} 
+        />
+        <div 
+          className="absolute w-96 h-96 bg-slate-600/10 blur-3xl animate-pulse transition-transform duration-1000" 
+          style={{ 
+            animationDuration: '8s', 
+            animationDelay: '2s',
+            transform: `translate(${-mousePosition.x / 50}px, ${-mousePosition.y / 50}px)`,
+            bottom: 0,
+            right: '-12rem'
+          }} 
+        />
+        <div 
+          className="absolute w-96 h-96 bg-slate-800/10 blur-3xl animate-pulse transition-transform duration-1000" 
+          style={{ 
+            animationDuration: '8s', 
+            animationDelay: '4s',
+            transform: `translate(${mousePosition.x / 100}px, ${mousePosition.y / 100}px)`,
+            top: '50%',
+            left: '50%'
+          }} 
+        />
       </div>
 
+      {/* Custom CSS for animations */}
+      <style jsx global>{`
+        .clip-corner {
+          clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+        }
+        .clip-corner-sm {
+          clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+        }
+        .clip-corner-lg {
+          clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 0 100%);
+        }
+        
+        @keyframes scanline {
+          0% { transform: translateY(-100%); opacity: 0; }
+          50% { opacity: 1; }
+          100% { transform: translateY(200%); opacity: 0; }
+        }
+        .scan-line {
+          animation: scanline 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(148, 163, 184, 0.2); }
+          50% { box-shadow: 0 0 40px rgba(148, 163, 184, 0.4); }
+        }
+        .pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes slideInLeft {
+          from { transform: translateX(-100px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideInRight {
+          from { transform: translateX(100px); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        .slide-in-left { animation: slideInLeft 0.6s ease-out; }
+        .slide-in-right { animation: slideInRight 0.6s ease-out; }
+        
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-up { animation: fadeInUp 0.6s ease-out; }
+        
+        .stagger-1 { animation-delay: 0.1s; }
+        .stagger-2 { animation-delay: 0.2s; }
+        .stagger-3 { animation-delay: 0.3s; }
+        .stagger-4 { animation-delay: 0.4s; }
+        .stagger-5 { animation-delay: 0.5s; }
+        .stagger-6 { animation-delay: 0.6s; }
+        .stagger-7 { animation-delay: 0.7s; }
+        .stagger-8 { animation-delay: 0.8s; }
+        .stagger-9 { animation-delay: 0.9s; }
+        .stagger-10 { animation-delay: 1s; }
+        
+        @keyframes shimmer {
+          0% { background-position: -1000px 0; }
+          100% { background-position: 1000px 0; }
+        }
+        .shimmer {
+          background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.2), transparent);
+          background-size: 1000px 100%;
+          animation: shimmer 3s infinite;
+        }
+        
+        .interactive-card {
+          position: relative;
+        }
+        .interactive-card::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(148, 163, 184, 0.1), transparent 40%);
+          opacity: 0;
+          transition: opacity 0.3s;
+          pointer-events: none;
+        }
+        .interactive-card:hover::before {
+          opacity: 1;
+        }
+        
+        @keyframes rotateIn {
+          from { transform: rotate(-180deg) scale(0); opacity: 0; }
+          to { transform: rotate(0) scale(1); opacity: 1; }
+        }
+        .rotate-in { animation: rotateIn 0.5s ease-out; }
+        
+        /* Tab slide indicator */
+        .tab-indicator {
+          position: absolute;
+          bottom: 0;
+          height: 4px;
+          background: linear-gradient(90deg, transparent, rgb(148 163 184), transparent);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Number counter effect */
+        @keyframes countUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.5); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .count-up { animation: countUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        
+        /* Glitch text effect */
+        @keyframes glitch {
+          0% { transform: translate(0); }
+          20% { transform: translate(-2px, 2px); }
+          40% { transform: translate(-2px, -2px); }
+          60% { transform: translate(2px, 2px); }
+          80% { transform: translate(2px, -2px); }
+          100% { transform: translate(0); }
+        }
+        .glitch:hover { animation: glitch 0.3s cubic-bezier(.25,.46,.45,.94) both; }
+      `}</style>
+
       <div className="relative">
-        {/* Navigation */}
-        <nav className="sticky top-0 z-40 px-4 md:px-6 pt-6">
+        {/* Navigation with parallax effect */}
+        <nav className="sticky top-0 z-50 px-4 md:px-6 pt-6 backdrop-blur-sm">
           <div className="container mx-auto">
-            <div className="bg-slate-900/95 border border-slate-700/50 rounded-2xl px-4 md:px-6 py-3 flex justify-between items-center shadow-lg shadow-black/20">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800 shadow-md">
+            <div className="bg-slate-900/95 border-b-2 border-slate-700/50 px-4 md:px-6 py-3 flex justify-between items-center shadow-lg shadow-black/20 clip-corner pulse-glow">
+              <div className="flex items-center gap-3 slide-in-left">
+                <div className="w-10 h-10 flex items-center justify-center bg-slate-800 shadow-md clip-corner-sm">
                   <img src="/icon/meteoricon.png" alt="Typemeteor Icon" className="w-6 h-6" />
                 </div>
-                <h1 className="text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-tight">
+                <h1 className="text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-[0.2em] glitch">
                   TYPEMETEOR
                 </h1>
               </div>
-              <div className="hidden md:flex gap-8 items-center text-sm font-medium">
-                <button onClick={() => scrollToSection('features')} className="text-gray-300 hover:text-white transition-colors">
+              <div className="hidden md:flex gap-8 items-center text-sm font-medium uppercase tracking-wider slide-in-right">
+                <button onClick={() => scrollToSection('features')} className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-110 hover:tracking-widest">
                   Features
                 </button>
-                <button onClick={() => scrollToSection('languages')} className="text-gray-300 hover:text-white transition-colors">
+                <button onClick={() => scrollToSection('languages')} className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-110 hover:tracking-widest">
                   Languages
                 </button>
-                <button onClick={() => scrollToSection('leaderboard')} className="text-gray-300 hover:text-white transition-colors">
+                <button onClick={() => scrollToSection('leaderboard')} className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-110 hover:tracking-widest">
                   Leaderboard
                 </button>
-                <button onClick={scrollToLanguages} className="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 rounded-lg font-semibold shadow-md transition-all duration-300">
+                <button onClick={scrollToLanguages} className="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 font-semibold shadow-md transition-all duration-300 clip-corner-sm hover:scale-110 hover:shadow-lg hover:shadow-slate-600/50">
                   Start Test
                 </button>
               </div>
@@ -152,30 +444,31 @@ export default function Homepage() {
           style={{
             backgroundImage: "url('/herocarousel.jpg')",
             backgroundSize: 'cover',
-            backgroundPosition: 'center'
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
           }}
         >
           <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-900/90 to-slate-950/50" />
           
           <div className="relative z-10 w-full max-w-6xl flex flex-col gap-10">
             {/* Logo */}
-            <div className="flex justify-center">
-              <div className="bg-slate-900/90 border border-slate-700/50 rounded-4xl px-10 py-6 md:px-16 md:py-8 shadow-[0_25px_60px_rgba(0,0,0,0.5)] flex flex-col items-center gap-4">
+            <div className="flex justify-center fade-in-up">
+              <div className="bg-slate-900/90 border-l-4 border-slate-600 px-10 py-6 md:px-16 md:py-8 shadow-[0_25px_60px_rgba(0,0,0,0.5)] flex flex-col items-center gap-4 clip-corner-lg hover:border-slate-400 transition-all duration-300 hover:shadow-[0_35px_80px_rgba(0,0,0,0.7)]">
                 <div className="flex items-center gap-3 md:gap-4">
-                  <img src="/icon/meteoricon.png" alt="Meteor Icon" className="w-12 h-12" />
+                  <img src="/icon/meteoricon.png" alt="Meteor Icon" className="w-12 h-12 rotate-in" />
                   <span className="text-3xl md:text-5xl font-black tracking-[0.2em] uppercase">
                     TYPE<span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">METEOR</span>
                   </span>
                 </div>
-                <p className="text-xs md:text-sm tracking-[0.35em] uppercase text-gray-400 text-center">
+                <p className="text-xs md:text-sm tracking-[0.35em] uppercase text-gray-400 text-center shimmer">
                   Test your typing speed and compete with other users.
                 </p>
               </div>
             </div>
 
             {/* Banner */}
-            <div className="flex justify-center">
-              <div className="bg-slate-700 px-8 md:px-16 py-3 md:py-4 rounded-none md:rounded-xl shadow-[0_18px_40px_rgba(0,0,0,0.4)]">
+            <div className="flex justify-center fade-in-up stagger-1">
+              <div className="bg-slate-700 px-8 md:px-16 py-3 md:py-4 shadow-[0_18px_40px_rgba(0,0,0,0.4)] clip-corner hover:bg-slate-600 transition-all duration-300 hover:scale-105">
                 <p className="text-sm md:text-xl font-black tracking-[0.35em] md:tracking-[0.5em] uppercase text-center">
                   Free Typing · typemeteor
                 </p>
@@ -183,16 +476,16 @@ export default function Homepage() {
             </div>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-6 max-w-3xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-6 max-w-3xl mx-auto w-full fade-in-up stagger-2">
               <button
                 onClick={scrollToLanguages}
-                className="flex-1 bg-slate-900/90 border border-slate-700/50 rounded-2xl px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:border-slate-600 hover:bg-slate-800/90 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)]">
+                className="flex-1 bg-slate-900/90 border-l-4 border-slate-600 px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:border-slate-500 hover:bg-slate-800/90 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)] clip-corner group hover:scale-105">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center">
+                  <div className="w-10 h-10 flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
                     <img src="/icon/meteoricon.png" alt="Restart Icon" className="w-8 h-8" />
                   </div>
                   <div className="text-left">
-                    <p className="text-[11px] md:text-xs uppercase tracking-[0.25em] text-gray-400">
+                    <p className="text-[11px] md:text-xs uppercase tracking-[0.25em] text-gray-400 group-hover:text-gray-300 transition-colors">
                       Start Typing
                     </p>
                     <p className="text-lg md:text-xl font-bold text-white">Start 1-Minute Test</p>
@@ -202,14 +495,14 @@ export default function Homepage() {
 
               <button
                 onClick={() => scrollToSection('leaderboard')}
-                className="flex-1 bg-slate-700 text-white rounded-2xl px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:bg-slate-600 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)]">
+                className="flex-1 bg-slate-700 text-white px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:bg-slate-600 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)] clip-corner group hover:scale-105">
                 <div className="text-left">
-                  <p className="text-[11px] md:text-xs uppercase tracking-[0.25em] text-gray-300">
+                  <p className="text-[11px] md:text-xs uppercase tracking-[0.25em] text-gray-300 group-hover:text-white transition-colors">
                     Ranking Area
                   </p>
                   <p className="text-lg md:text-xl font-black">Explore Leaderboard</p>
                 </div>
-                <div className="w-10 h-10 rounded-xl border border-white/30 flex items-center justify-center">
+                <div className="w-10 h-10 border-2 border-white/30 flex items-center justify-center clip-corner-sm group-hover:border-white/50 group-hover:rotate-12 transition-all duration-300">
                   <img src="/icon/rocket.png" alt="Arrow" className="w-6 h-6" />
                 </div>
               </button>
@@ -220,8 +513,8 @@ export default function Homepage() {
         {/* Features Section */}
         <section id="features" className="py-24 px-6">
           <div className="container mx-auto max-w-6xl">
-            <div className="text-center mb-16">
-              <h3 className="text-4xl md:text-5xl font-black mb-4">
+            <div className="text-center mb-16 fade-in-up">
+              <h3 className="text-4xl md:text-5xl font-black mb-4 uppercase tracking-wider">
                 Why Choose <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Typemeteor?</span>
               </h3>
               <p className="text-xl text-gray-400 max-w-2xl mx-auto">
@@ -231,16 +524,20 @@ export default function Homepage() {
             
             <div className="grid md:grid-cols-3 gap-8">
               {[
-                { icon: '/icon/globe.png', title: 'Multi-Language', desc: 'Practice typing in 17 languages including Indonesian, English, Spanish, French, German, Portuguese, Japanese, and more' },
-                { icon: '/icon/analytics.png', title: 'Real-Time Analytics', desc: 'Track your WPM, accuracy, and progress with detailed real-time statistics and performance insights' },
-                { icon: '/icon/competition.png', title: 'Competition', desc: 'Compete with typists worldwide on our leaderboard and see how you rank among the best' }
+                { icon: '/icon/globe.png', title: 'Multi-Language', desc: 'Practice typing in 17 languages including Indonesian, English, Spanish, French, German, Portuguese, Japanese, and more', delay: '0s' },
+                { icon: '/icon/analytics.png', title: 'Real-Time Analytics', desc: 'Track your WPM, accuracy, and progress with detailed real-time statistics and performance insights', delay: '0.2s' },
+                { icon: '/icon/competition.png', title: 'Competition', desc: 'Compete with typists worldwide on our leaderboard and see how you rank among the best', delay: '0.4s' }
               ].map((feature, i) => (
-                <div key={i} className="bg-slate-900/50 border border-slate-700/50 rounded-3xl p-8 hover:bg-slate-800/50 hover:border-slate-600 hover:-translate-y-2 transition-all duration-300 cursor-pointer">
-                  <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mb-6 shadow-md">
+                <div 
+                  key={i} 
+                  className="bg-slate-900/50 border-l-4 border-slate-700 p-8 hover:bg-slate-800/50 hover:border-slate-500 hover:-translate-y-2 transition-all duration-300 cursor-pointer clip-corner interactive-card group fade-in-up"
+                  style={{ animationDelay: feature.delay }}
+                >
+                  <div className="w-16 h-16 bg-slate-800 flex items-center justify-center mb-6 shadow-md clip-corner-sm group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
                     <img src={feature.icon} alt={feature.title} className="w-8 h-8" />
                   </div>
-                  <h4 className="text-2xl font-bold mb-4 text-white">{feature.title}</h4>
-                  <p className="text-gray-400 leading-relaxed">{feature.desc}</p>
+                  <h4 className="text-2xl font-bold mb-4 text-white uppercase tracking-wide group-hover:text-slate-200 transition-colors">{feature.title}</h4>
+                  <p className="text-gray-400 leading-relaxed group-hover:text-gray-300 transition-colors">{feature.desc}</p>
                 </div>
               ))}
             </div>
@@ -250,8 +547,8 @@ export default function Homepage() {
         {/* Language Selection */}
         <section id="languages" className="py-24 px-6 bg-linear-to-b from-transparent to-slate-900/50">
           <div className="container mx-auto max-w-7xl">
-            <div className="text-center mb-16">
-              <h3 className="text-4xl md:text-5xl font-black mb-4">
+            <div className="text-center mb-16 fade-in-up">
+              <h3 className="text-4xl md:text-5xl font-black mb-4 uppercase tracking-wider">
                 Choose Your <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Language</span>
               </h3>
               <p className="text-xl text-gray-400">
@@ -264,16 +561,15 @@ export default function Homepage() {
               <button
                 onClick={() => {
                   if (currentPage > 0) {
-                    setSlideDirection('left');
                     setCurrentPage(currentPage - 1);
                   }
                 }}
                 disabled={currentPage === 0}
-                className={`hidden lg:flex absolute -left-20 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-slate-900/50 border-2 border-slate-700/50 items-center justify-center transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg z-10 ${currentPage === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                className={`hidden lg:flex absolute -left-20 top-1/2 -translate-y-1/2 w-16 h-16 bg-slate-900/50 border-2 border-slate-700/50 items-center justify-center transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg z-10 clip-corner-sm ${currentPage === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'}`}>
                 <img src="/icon/left-arrow.png" alt="Previous" className="w-6 h-6" />
               </button>
 
-              {/* Language Grid Container with padding for selected card effect */}
+              {/* Language Grid Container */}
               <div className="overflow-hidden py-2">
                 <div 
                   className="flex transition-transform duration-500 ease-in-out"
@@ -306,11 +602,6 @@ export default function Homepage() {
                   {/* Page 2 */}
                   <div className="w-full shrink-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-max">
                     <LanguageCard code="hindi" name="Hindi" native="हिन्दी" flag="/flags/hindi.png" page={2} />
-                    {/* Empty placeholders to maintain grid structure */}
-                    <div className="hidden lg:block"></div>
-                    <div className="hidden lg:block"></div>
-                    <div className="hidden lg:block"></div>
-                    <div className="hidden lg:block"></div>
                     <div className="hidden lg:block"></div>
                     <div className="hidden lg:block"></div>
                     <div className="hidden lg:block"></div>
@@ -321,12 +612,11 @@ export default function Homepage() {
               <button
                 onClick={() => {
                   if (currentPage < totalPages - 1) {
-                    setSlideDirection('right');
                     setCurrentPage(currentPage + 1);
                   }
                 }}
                 disabled={currentPage === totalPages - 1}
-                className={`hidden lg:flex absolute -right-20 top-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-slate-900/50 border-2 border-slate-700/50 items-center justify-center transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg z-10 ${currentPage === totalPages - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}>
+                className={`hidden lg:flex absolute -right-20 top-1/2 -translate-y-1/2 w-16 h-16 bg-slate-900/50 border-2 border-slate-700/50 items-center justify-center transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg z-10 clip-corner-sm ${currentPage === totalPages - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'}`}>
                 <img src="/icon/right-arrow.png" alt="Next" className="w-6 h-6" />
               </button>
 
@@ -335,14 +625,11 @@ export default function Homepage() {
                 {[0, 1, 2].map(page => (
                   <button
                     key={page}
-                    onClick={() => {
-                      setSlideDirection(page > currentPage ? 'right' : 'left');
-                      setCurrentPage(page);
-                    }}
-                    className={`h-3 rounded-full transition-all ${
+                    onClick={() => setCurrentPage(page)}
+                    className={`h-3 transition-all duration-300 ${
                       currentPage === page 
-                        ? 'w-8 bg-slate-600' 
-                        : 'w-3 bg-slate-700/50'
+                        ? 'w-8 bg-slate-500' 
+                        : 'w-3 bg-slate-700/50 hover:bg-slate-600/50'
                     }`}
                   />
                 ))}
@@ -351,10 +638,10 @@ export default function Homepage() {
 
             {/* Start Button */}
             {selectedLanguage && (
-              <div className="text-center mt-12 animate-in slide-in-from-bottom duration-500">
+              <div className="text-center mt-12 fade-in-up">
                 <Link 
                   href={`/language/${selectedLanguage}`}
-                  className="bg-slate-700 hover:bg-slate-600 px-16 py-6 rounded-2xl font-bold text-2xl shadow-xl transition-all duration-300 inline-flex items-center gap-3 hover:scale-105"
+                  className="bg-slate-700 hover:bg-slate-600 px-16 py-6 font-bold text-2xl shadow-xl transition-all duration-300 inline-flex items-center gap-3 hover:scale-110 clip-corner uppercase tracking-wider pulse-glow"
                 >
                   <span>Start 1-Minute Test</span>
                   <img src="/icon/right-arrow.png" alt="Arrow" className="w-6 h-6" />
@@ -367,11 +654,11 @@ export default function Homepage() {
           </div>
         </section>
 
-        {/* Leaderboard Section */}
+        {/* Leaderboard Section with Slide Navigation */}
         <section id="leaderboard" className="py-24 px-6 bg-linear-to-b from-slate-900/50 to-transparent">
-          <div className="container mx-auto max-w-4xl">
-            <div className="text-center mb-16">
-              <h3 className="text-4xl md:text-5xl font-black mb-4">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-16 fade-in-up">
+              <h3 className="text-4xl md:text-5xl font-black mb-4 uppercase tracking-wider">
                 Global <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Leaderboard</span>
               </h3>
               <p className="text-xl text-gray-400">
@@ -379,61 +666,167 @@ export default function Homepage() {
               </p>
             </div>
             
-            <div className="bg-slate-900/50 border border-slate-700/50 rounded-3xl p-8">
+            {/* Slide Navigation with Dropdown */}
+            <div className="mb-8 relative">
+              <div className="flex items-center gap-4 justify-center">
+                <button
+                  onClick={() => {
+                    const currentIndex = languageTabs.indexOf(activeLeaderboardTab);
+                    if (currentIndex > 0) {
+                      setActiveLeaderboardTab(languageTabs[currentIndex - 1]);
+                      setShowLanguageDropdown(false);
+                    }
+                  }}
+                  disabled={languageTabs.indexOf(activeLeaderboardTab) === 0}
+                  className={`w-12 h-12 flex items-center justify-center bg-slate-900/50 border-2 border-slate-700/50 transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg clip-corner-sm ${
+                    languageTabs.indexOf(activeLeaderboardTab) === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'
+                  }`}
+                >
+                  <img src="/icon/left-arrow.png" alt="Previous" className="w-5 h-5" />
+                </button>
+
+                <div className="relative language-dropdown-container">
+                  <button
+                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                    className="bg-slate-900/50 px-8 py-3 font-bold uppercase tracking-wider clip-corner-sm min-w-[200px] text-center border-l-4 border-slate-700 hover:bg-slate-800/50 hover:border-slate-600 transition-all flex items-center justify-between gap-3"
+                  >
+                    <span className="text-white">{languageNames[activeLeaderboardTab]}</span>
+                    <svg 
+                      className={`w-5 h-5 transition-transform duration-300 ${showLanguageDropdown ? 'rotate-180' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {showLanguageDropdown && (
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[600px] bg-slate-900/95 border-2 border-slate-700 shadow-xl z-50 clip-corner backdrop-blur-sm">
+                      <div className="grid grid-cols-3 gap-1 p-2">
+                        {languageTabs.map((tab) => (
+                          <button
+                            key={tab}
+                            onClick={() => {
+                              setActiveLeaderboardTab(tab);
+                              setShowLanguageDropdown(false);
+                            }}
+                            className={`px-4 py-3 text-center hover:bg-slate-800/70 transition-all uppercase tracking-wider text-sm font-semibold border-l-4 bg-slate-900/95 clip-corner-sm ${
+                              activeLeaderboardTab === tab 
+                                ? 'border-slate-400 text-white bg-slate-800/50' 
+                                : 'border-transparent text-gray-300 hover:border-slate-600'
+                            }`}
+                          >
+                            {languageNames[tab]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    const currentIndex = languageTabs.indexOf(activeLeaderboardTab);
+                    if (currentIndex < languageTabs.length - 1) {
+                      setActiveLeaderboardTab(languageTabs[currentIndex + 1]);
+                      setShowLanguageDropdown(false);
+                    }
+                  }}
+                  disabled={languageTabs.indexOf(activeLeaderboardTab) === languageTabs.length - 1}
+                  className={`w-12 h-12 flex items-center justify-center bg-slate-900/50 border-2 border-slate-700/50 transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg clip-corner-sm ${
+                    languageTabs.indexOf(activeLeaderboardTab) === languageTabs.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'
+                  }`}
+                >
+                  <img src="/icon/right-arrow.png" alt="Next" className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-8 clip-corner-lg">
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin inline-block w-8 h-8 border-4 border-slate-600 border-t-transparent rounded-full mb-4" />
-                  <p className="text-gray-400">Loading leaderboard...</p>
+                  <div className="animate-spin inline-block w-12 h-12 border-4 border-slate-600 border-t-slate-400 mb-4"></div>
+                  <p className="text-gray-400 uppercase tracking-wider">Loading leaderboard...</p>
                 </div>
               ) : leaderboard.length > 0 ? (
                 <div className="space-y-3">
-                  {leaderboard.map((score: LeaderboardEntry, i: number) => (
-                    <div key={i} className="flex items-center justify-between p-5 bg-slate-800/30 border border-slate-700/30 rounded-2xl hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300">
-                      <div className="flex items-center gap-4">
-                        <span className={`text-3xl font-bold min-w-12 ${i < 3 ? 'bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent' : 'text-gray-500'}`}>
-                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
-                        </span>
-                        <div>
-                          <div className="font-bold text-lg text-white">{score.name}</div>
-                          <div className="text-sm text-gray-400">{score.language}</div>
+                  {leaderboard.slice(0, 10).map((score: LeaderboardEntry, i: number) => (
+                    <div
+                      key={i}
+                      className={`flex items-center justify-between p-5 border-l-4 transition-all duration-300 clip-corner interactive-card group fade-in-up stagger-${i + 1}
+                        ${i < 3 ? 'bg-slate-800/60 border-slate-400' : 'bg-slate-900/30 border-slate-700/30'} 
+                        hover:bg-slate-700/40 hover:border-slate-500 hover:-translate-y-1 hover:shadow-lg`}
+                    >
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <div className={`w-12 h-12 flex items-center justify-center font-black text-2xl shrink-0 clip-corner-sm transition-all duration-300 count-up
+                          ${i < 3 ? 'bg-slate-700 group-hover:scale-110 group-hover:rotate-6' : 'bg-slate-800 group-hover:scale-105'}`}
+                        >
+                          {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-bold text-lg text-white truncate uppercase tracking-wide group-hover:text-slate-200 transition-colors">
+                            {score.name}
+                          </div>
+                          <div className="text-xs text-gray-400 uppercase tracking-wider">
+                            {activeLeaderboardTab === 'overall' ? score.language : new Date(score.timestamp).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-8 items-center">
-                        <div className="text-right">
-                          <div className="text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{score.wpm}</div>
-                          <div className="text-xs text-gray-400 font-medium flex items-center gap-1 justify-end">
-                            <img src="/icon/wpm.png" alt="WPM" className="w-3 h-3 opacity-70" />
-                            WPM
+                      <div className="flex gap-8 items-center shrink-0">
+                        <div className="text-center">
+                          <div className="font-black text-2xl bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent count-up">
+                            {score.wpm}
                           </div>
+                          <div className="text-xs text-gray-400 uppercase tracking-wider">{activeLeaderboardTab === 'overall' ? 'Total WPM' : 'WPM'}</div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xl font-bold text-emerald-400">{score.accuracy}%</div>
-                          <div className="text-xs text-gray-400 font-medium flex items-center gap-1 justify-end">
-                            <img src="/icon/accuracy.png" alt="Accuracy" className="w-3 h-3 opacity-70" />
-                            Accuracy
-                          </div>
+                        <div className="text-center">
+                          <div className="font-black text-xl text-emerald-400 count-up">{score.accuracy}%</div>
+                          <div className="text-xs text-gray-400 uppercase tracking-wider">ACC</div>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-center text-gray-400 py-8">No scores available yet. Be the first to set a record!</p>
+                <p className="text-center text-gray-400 py-8 uppercase tracking-wider">No scores available yet. Be the first to set a record!</p>
               )}
             </div>
+            
+            {/* Stats Summary */}
+            {!loading && leaderboard.length > 0 && (
+              <div className="mt-8 grid grid-cols-3 gap-4 fade-in-up">
+                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
+                  <div className="text-2xl font-black text-white count-up">{leaderboard.length}</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider">Total Players</div>
+                </div>
+                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
+                  <div className="text-2xl font-black text-emerald-400 count-up">
+                    {leaderboard.length > 0 ? Math.max(...leaderboard.map(s => s.wpm)) : 0}
+                  </div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider">Top {activeLeaderboardTab === 'overall' ? 'Total ' : ''}WPM</div>
+                </div>
+                <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 clip-corner hover:border-slate-600 transition-all duration-300 hover:-translate-y-1">
+                  <div className="text-2xl font-black text-yellow-400 count-up">
+                    {leaderboard.length > 0 ? Math.max(...leaderboard.map(s => s.accuracy)) : 0}%
+                  </div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wider">Best Accuracy</div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
         {/* Footer */}
-        <footer className="py-12 px-6 border-t border-slate-700/30">
+        <footer className="py-12 px-6 border-t-2 border-slate-700/30">
           <div className="container mx-auto text-center">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+            <div className="flex items-center justify-center gap-3 mb-4 fade-in-up">
+              <div className="w-8 h-8 flex items-center justify-center clip-corner-sm">
                 <img src="/icon/meteoricon.png" alt="Meteor Icon" className="w-6 h-6" />
               </div>
-              <h1 className="text-xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">TYPEMETEOR</h1>
+              <h1 className="text-xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-[0.2em]">TYPEMETEOR</h1>
             </div>
-            <p className="text-gray-400 mb-2">© 2025 Typemeteor</p>
+            <p className="text-gray-400 mb-2 uppercase tracking-wider">© 2025 Typemeteor</p>
             <p className="text-gray-500 text-sm">Made with ❤️ for typists worldwide</p>
           </div>
         </footer>
