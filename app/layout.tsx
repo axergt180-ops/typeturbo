@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL('https://typemeteor.sbs'),
   title: {
-    default: "Typemeteor - Free Typing Speed Test in 17 Languages",
+    default: "Typemeteor - Typing Speed",
     template: "%s | Typemeteor"
   },
   description: "Test your typing speed with Typemeteor. Free online typing test available in 17 languages including Indonesian, English, Spanish, French, German, and more. Improve your WPM and compete on the leaderboard.",
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://typemeteor.sbs',
     title: 'Typemeteor - Test Your Typing Speed in Multiple Languages',
-    description: 'Free online typing speed test in 17 languages. Measure your WPM, track your progress, and compete with typists worldwide.',
+    description: 'Free online typing speed test. Measure your WPM, track your progress, and compete with typists worldwide.',
     siteName: 'Typemeteor',
     images: [{
       url: '/og-image.png', // Tambahkan gambar OG nanti
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Typemeteor - Free Typing Speed Test',
-    description: 'Test your typing speed in 17 languages. Improve your WPM and compete globally.',
+    description: 'Test your typing speed. Improve your WPM and compete globally.',
     images: ['/og-image.png'],
   },
   verification: {

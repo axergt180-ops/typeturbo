@@ -78,6 +78,7 @@ export default function TypingTestPage() {
   const [rows, setRows] = useState<number[][]>([]);
   const [currentVisibleRow, setCurrentVisibleRow] = useState(0);
   const [wordsLoading, setWordsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -342,11 +343,26 @@ export default function TypingTestPage() {
       return;
     }
 
+    if (isSaving) {
+      return; // Prevent double submission
+    }
+
+    setIsSaving(true);
+
     try {
+      console.log('Saving score to:', `${leaderboardApiUrl}/leaderboard`);
+      console.log('Payload:', {
+        name: playerName.trim(),
+        wpm: stats.wpm,
+        accuracy: stats.accuracy,
+        language: language
+      });
+
       const response = await fetch(`${leaderboardApiUrl}/leaderboard`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           name: playerName.trim(),
@@ -356,23 +372,45 @@ export default function TypingTestPage() {
         })
       });
 
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+
       if (response.ok) {
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (e) {
+          console.log('Response is not JSON, but request was successful');
+        }
+        
         alert('Score saved successfully! 🎉');
         await loadLeaderboard();
         setPlayerName('');
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' })) as { error?: string };
-        console.error('Save error:', errorData);
-        alert(`Failed to save score: ${errorData.error || 'Server error'}`);
+        let errorMessage = 'Server error';
+        try {
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.error || errorData.message || 'Unknown error';
+        } catch (e) {
+          errorMessage = responseText || `HTTP ${response.status}`;
+        }
+        
+        console.error('Save error:', errorMessage);
+        alert(`Failed to save score: ${errorMessage}\n\nPlease try again or contact support if the problem persists.`);
       }
     } catch (error) {
       console.error('Error saving score:', error);
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        alert('Network error: Unable to connect to leaderboard server. Please check your internet connection and try again.');
+        alert('Network error: Unable to connect to server.\n\nPlease check:\n- Your internet connection\n- Server is running\n- API URL is correct\n\nCurrent API: ' + leaderboardApiUrl);
       } else {
-        alert('Failed to save score. Please try again later.');
+        alert(`Failed to save score: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again.`);
       }
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -383,7 +421,7 @@ export default function TypingTestPage() {
       return (
         <span 
           key={index} 
-          className="inline-block px-2 py-0.5 bg-slate-600/30 border-2 border-slate-500 text-white font-semibold transform scale-105 clip-corner-sm"
+          className="inline-block px-0.5 sm:px-1 md:px-2 py-0.5 bg-slate-600/30 border border-slate-500 md:border-2 text-white font-semibold transform scale-105 clip-corner-sm"
         >
           {renderCurrentWordChars(word)}
         </span>
@@ -393,7 +431,7 @@ export default function TypingTestPage() {
         return (
           <span 
             key={index} 
-            className="inline-block px-2 py-0.5 bg-green-500/20 text-green-400 font-semibold clip-corner-sm"
+            className="inline-block px-0.5 sm:px-1 md:px-2 py-0.5 bg-green-500/20 text-green-400 font-semibold clip-corner-sm"
           >
             {word}
           </span>
@@ -402,7 +440,7 @@ export default function TypingTestPage() {
         return (
           <span 
             key={index} 
-            className="inline-block px-2 py-0.5 bg-red-500/20 border border-red-500/30 font-semibold clip-corner-sm"
+            className="inline-block px-0.5 sm:px-1 md:px-2 py-0.5 bg-red-500/20 border border-red-500/30 font-semibold clip-corner-sm"
           >
             {renderIncorrectWord(word, typedWord.original)}
           </span>
@@ -411,7 +449,7 @@ export default function TypingTestPage() {
     }
     
     return (
-      <span key={index} className="inline-block px-2 py-0.5 text-gray-400 opacity-60">
+      <span key={index} className="inline-block px-0.5 sm:px-1 md:px-2 py-0.5 text-gray-400 opacity-60">
         {word}
       </span>
     );
@@ -528,82 +566,78 @@ export default function TypingTestPage() {
             <div className="mb-3">
               <img src={config.flag} alt={`${config.name} Flag`} className="w-16 h-16 md:w-24 md:h-24 mx-auto object-contain" />
             </div>
-            <h2 className="text-2xl md:text-4xl font-black mb-2 uppercase tracking-wider">
+            <h2 className="text-2xl md:text-4xl font-black mb-2 uppercase tracking-wider break-words px-4">
               <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{config.name}</span> Typing Test
             </h2>
-            <p className="text-base md:text-xl text-gray-400 uppercase tracking-wide">1 minute test - Type as many words as you can!</p>
+            <p className="text-base md:text-xl text-gray-400 uppercase tracking-wide px-4 break-words">1 minute test - Type as many words as you can!</p>
           </div>
 
           {/* Stats Bar */}
-          <div className="grid grid-cols-3 gap-3 md:gap-4 mb-6">
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
+          <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
               <div className="mb-2">
-                <img src="/icon/clock.png" alt="Time" className="w-10 h-10 md:w-12 md:h-12 mx-auto" />
+                <img src="/icon/clock.png" alt="Time" className="w-8 h-8 md:w-12 md:h-12 mx-auto" />
               </div>
-              <div className="text-2xl md:text-4xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{stats.timeLeft}</div>
-              <div className="text-xs md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider">Time Left</div>
+              <div className="text-xl md:text-4xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{stats.timeLeft}</div>
+              <div className="text-[10px] md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider break-words">Time</div>
             </div>
             
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
               <div className="mb-2">
-                <img src="/icon/wpm.png" alt="WPM" className="w-10 h-10 md:w-12 md:h-12 mx-auto" />
+                <img src="/icon/wpm.png" alt="WPM" className="w-8 h-8 md:w-12 md:h-12 mx-auto" />
               </div>
-              <div className="text-2xl md:text-4xl font-black text-green-400">{stats.wpm}</div>
-              <div className="text-xs md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider">WPM</div>
+              <div className="text-xl md:text-4xl font-black text-green-400">{stats.wpm}</div>
+              <div className="text-[10px] md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider">WPM</div>
             </div>
             
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
               <div className="mb-2">
-                <img src="/icon/accuracy.png" alt="Accuracy" className="w-10 h-10 md:w-12 md:h-12 mx-auto" />
+                <img src="/icon/accuracy.png" alt="Accuracy" className="w-8 h-8 md:w-12 md:h-12 mx-auto" />
               </div>
-              <div className="text-2xl md:text-4xl font-black text-yellow-400">{stats.accuracy}%</div>
-              <div className="text-xs md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider">Accuracy</div>
+              <div className="text-xl md:text-4xl font-black text-yellow-400">{stats.accuracy}%</div>
+              <div className="text-[10px] md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider break-words">ACC</div>
             </div>
           </div>
 
           {!isFinished ? (
             // Test Area
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-8 clip-corner-lg">
-              {/* Words Display */}
-              <div className="mb-4 md:mb-6 p-6 md:p-8 bg-slate-800/50 min-h-[280px] md:min-h-[320px] flex items-center justify-center overflow-hidden clip-corner">
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-8 clip-corner-lg">
+              {/* Words Display - Desktop unchanged, Mobile optimized */}
+              <div className="mb-4 md:mb-6 p-3 md:p-6 lg:p-8 bg-slate-800/50 min-h-[200px] md:min-h-[280px] lg:min-h-[320px] flex items-center justify-center overflow-hidden clip-corner">
                 {wordsLoading ? (
                   <div className="text-center">
                     <div className="animate-spin inline-block w-8 h-8 border-4 border-slate-600 border-t-transparent mb-4" />
-                    <p className="text-gray-400 uppercase tracking-wider">Loading words...</p>
+                    <p className="text-gray-400 uppercase tracking-wider text-sm">Loading...</p>
                   </div>
                 ) : visibleRows.length > 0 ? (
-                  <div className="w-full space-y-5">
+                  <div className="w-full space-y-2 md:space-y-4 lg:space-y-5">
                     {visibleRows.map((rowIndices, rowIdx) => (
                       <div 
                         key={startRow + rowIdx} 
-                        className="flex justify-between items-center text-xl md:text-2xl font-medium leading-relaxed"
-                        style={{
-                          textAlign: 'justify',
-                          textJustify: 'inter-word'
-                        }}
+                        className="flex justify-between items-center text-xs sm:text-sm md:text-xl lg:text-2xl font-medium leading-relaxed"
                       >
                         {rowIndices.map((wordIndex, idx) => (
                           <React.Fragment key={wordIndex}>
                             {renderWord(words[wordIndex], wordIndex)}
-                            {idx < rowIndices.length - 1 && <span className="flex-grow min-w-[0.25rem]" />}
+                            {idx < rowIndices.length - 1 && <span className="flex-grow min-w-[0.1rem] sm:min-w-[0.15rem] md:min-w-[0.25rem]" />}
                           </React.Fragment>
                         ))}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center max-w-md mx-auto">
+                  <div className="text-center max-w-md mx-auto px-4">
                     <div className="mb-4">
                       <img src="/icon/analytics.png" alt="Error" className="w-16 h-16 mx-auto opacity-50" />
                     </div>
-                    <p className="text-red-400 mb-2 font-semibold text-lg uppercase tracking-wider">Failed to load words</p>
-                    <p className="text-gray-400 text-sm mb-6">Please check your internet connection and try again</p>
+                    <p className="text-red-400 mb-2 font-semibold text-base md:text-lg uppercase tracking-wider break-words">Failed to load words</p>
+                    <p className="text-gray-400 text-xs md:text-sm mb-6 break-words">Please check your connection</p>
                     <button 
                       onClick={loadWords}
-                      className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold transition-all hover:scale-105 flex items-center gap-2 mx-auto shadow-lg clip-corner-sm uppercase tracking-wider"
+                      className="px-6 py-2.5 md:px-8 md:py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm md:text-base transition-all hover:scale-105 flex items-center gap-2 mx-auto shadow-lg clip-corner-sm uppercase tracking-wider"
                     >
-                      <img src="/icon/restart.png" alt="Retry" className="w-5 h-5" />
-                      <span>Retry Loading</span>
+                      <img src="/icon/restart.png" alt="Retry" className="w-4 h-4 md:w-5 md:h-5" />
+                      <span>Retry</span>
                     </button>
                   </div>
                 )}
@@ -616,25 +650,25 @@ export default function TypingTestPage() {
                 value={currentInput}
                 onChange={handleInput}
                 onKeyDown={handleKeyDown}
-                placeholder="Start typing here..."
+                placeholder="Start typing..."
                 disabled={wordsLoading || words.length === 0}
-                className="w-full p-4 md:p-5 text-lg md:text-xl bg-slate-800 border-2 border-slate-600 focus:outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-500/20 transition-all text-white placeholder-gray-500 disabled:opacity-50 disabled:cursor-not-allowed clip-corner"
+                className="w-full p-3 md:p-5 text-base md:text-xl bg-slate-800 border-2 border-slate-600 focus:outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-500/20 transition-all text-white placeholder-gray-500 disabled:opacity-50 disabled:cursor-not-allowed clip-corner"
                 autoComplete="off"
                 autoFocus
               />
               
-              <div className="mt-3 md:mt-4 text-center text-gray-400 text-base md:text-lg flex items-center justify-center gap-2 uppercase tracking-wider">
+              <div className="mt-3 md:mt-4 text-center text-gray-400 text-xs md:text-lg flex flex-wrap items-center justify-center gap-2 uppercase tracking-wider px-4">
                 {wordsLoading ? (
-                  'Loading words...'
+                  'Loading...'
                 ) : isActive ? (
                   <>
-                    Keep typing! Press SPACE after each word 
-                    <img src="/icon/rocket.png" alt="Rocket" className="w-5 h-5 inline-block" />
+                    <span className="break-words">Keep typing! Press SPACE</span>
+                    <img src="/icon/rocket.png" alt="Rocket" className="w-4 h-4 md:w-5 md:h-5 inline-block shrink-0" />
                   </>
                 ) : (
                   <>
-                    Start typing to begin the timer 
-                    <img src="/icon/clock.png" alt="Clock" className="w-5 h-5 inline-block" />
+                    <span className="break-words">Start typing to begin</span>
+                    <img src="/icon/clock.png" alt="Clock" className="w-4 h-4 md:w-5 md:h-5 inline-block shrink-0" />
                   </>
                 )}
               </div>
@@ -642,133 +676,144 @@ export default function TypingTestPage() {
               <button
                 onClick={resetTest}
                 disabled={wordsLoading}
-                className="mt-4 md:mt-6 mx-auto flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-base md:text-lg shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed clip-corner-sm uppercase tracking-wider"
+                className="mt-4 md:mt-6 mx-auto flex items-center gap-2 px-5 md:px-8 py-2.5 md:py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm md:text-lg shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed clip-corner-sm uppercase tracking-wider"
               >
-                <img src="/icon/restart.png" alt="Restart" className="w-5 h-5" />
-                <span>Restart Test</span>
+                <img src="/icon/restart.png" alt="Restart" className="w-4 h-4 md:w-5 md:h-5" />
+                <span>Restart</span>
               </button>
             </div>
           ) : (
-            // Results Screen
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-6 md:p-10 text-center clip-corner-lg">
+            // Results Screen - Same as before but with break-words
+            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-10 text-center clip-corner-lg">
               <div className="mb-6">
-                <img src="/icon/meteoricon.png" alt="Complete" className="w-20 h-20 md:w-24 md:h-24 mx-auto" />
+                <img src="/icon/meteoricon.png" alt="Complete" className="w-16 h-16 md:w-24 md:h-24 mx-auto" />
               </div>
-              <h2 className="text-3xl md:text-4xl font-black mb-2 uppercase tracking-wider">
+              <h2 className="text-2xl md:text-4xl font-black mb-2 uppercase tracking-wider break-words px-4">
                 <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Test Complete!</span>
               </h2>
-              <p className="text-gray-400 mb-8 text-sm md:text-base uppercase tracking-wider">Here's how you performed</p>
+              <p className="text-gray-400 mb-6 md:mb-8 text-xs md:text-base uppercase tracking-wider px-4 break-words">Here's how you performed</p>
               
-              <div className="grid grid-cols-2 gap-3 md:gap-6 mb-8 md:mb-10 max-w-2xl mx-auto">
-                <div className="p-4 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
-                  <img src="/icon/wpm.png" alt="WPM" className="w-12 h-12 mx-auto mb-3" />
-                  <div className="text-4xl md:text-5xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent mb-2">{stats.wpm}</div>
-                  <div className="text-gray-300 font-medium text-sm md:text-base uppercase tracking-wider">Words/Min</div>
+              <div className="grid grid-cols-2 gap-2 md:gap-6 mb-6 md:mb-10 max-w-2xl mx-auto">
+                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                  <img src="/icon/wpm.png" alt="WPM" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
+                  <div className="text-3xl md:text-5xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent mb-1 md:mb-2">{stats.wpm}</div>
+                  <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">WPM</div>
                 </div>
                 
-                <div className="p-4 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
-                  <img src="/icon/accuracy.png" alt="Accuracy" className="w-12 h-12 mx-auto mb-3" />
-                  <div className="text-4xl md:text-5xl font-black text-green-400 mb-2">{stats.accuracy}%</div>
-                  <div className="text-gray-300 font-medium text-sm md:text-base uppercase tracking-wider">Accuracy</div>
+                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                  <img src="/icon/accuracy.png" alt="Accuracy" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
+                  <div className="text-3xl md:text-5xl font-black text-green-400 mb-1 md:mb-2">{stats.accuracy}%</div>
+                  <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">Accuracy</div>
                 </div>
                 
-                <div className="p-4 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
-                  <img src="/icon/competition.png" alt="Correct" className="w-12 h-12 mx-auto mb-3" />
-                  <div className="text-4xl md:text-5xl font-black text-yellow-400 mb-2">{stats.correctWords}</div>
-                  <div className="text-gray-300 font-medium text-sm md:text-base uppercase tracking-wider">Correct</div>
+                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                  <img src="/icon/competition.png" alt="Correct" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
+                  <div className="text-3xl md:text-5xl font-black text-yellow-400 mb-1 md:mb-2">{stats.correctWords}</div>
+                  <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">Correct</div>
                 </div>
                 
-                <div className="p-4 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
-                  <img src="/icon/analytics.png" alt="Wrong" className="w-12 h-12 mx-auto mb-3" />
-                  <div className="text-4xl md:text-5xl font-black text-red-400 mb-2">{stats.incorrectWords}</div>
-                  <div className="text-gray-300 font-medium text-sm md:text-base uppercase tracking-wider">Wrong</div>
+                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                  <img src="/icon/analytics.png" alt="Wrong" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
+                  <div className="text-3xl md:text-5xl font-black text-red-400 mb-1 md:mb-2">{stats.incorrectWords}</div>
+                  <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">Wrong</div>
                 </div>
               </div>
 
               {/* Performance Message */}
-              <div className="mb-6 p-4 bg-slate-800/50 border-l-4 border-slate-600 flex items-center justify-center gap-2 clip-corner">
-                <img src="/icon/competition.png" alt="Performance" className="w-5 h-5" />
-                <p className="text-lg md:text-xl font-bold text-white uppercase tracking-wide">{getPerformanceMessage()}</p>
-                <img src="/icon/competition.png" alt="Performance" className="w-5 h-5" />
+              <div className="mb-6 p-3 md:p-4 bg-slate-800/50 border-l-4 border-slate-600 flex flex-wrap items-center justify-center gap-2 clip-corner">
+                <img src="/icon/competition.png" alt="Performance" className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+                <p className="text-sm md:text-xl font-bold text-white uppercase tracking-wide break-words">{getPerformanceMessage()}</p>
+                <img src="/icon/competition.png" alt="Performance" className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
               </div>
 
               {/* Save Score */}
-              <div className="mb-8 max-w-md mx-auto">
+              <div className="mb-6 md:mb-8 max-w-md mx-auto px-4">
                 <input
                   type="text"
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
                   placeholder="Enter your name"
-                  className="w-full p-3 md:p-4 mb-4 bg-slate-800 border-2 border-slate-600 focus:outline-none focus:border-slate-500 text-white placeholder-gray-400 text-base md:text-lg clip-corner uppercase"
+                  disabled={isSaving}
+                  className="w-full p-2.5 md:p-4 mb-3 md:mb-4 bg-slate-800 border-2 border-slate-600 focus:outline-none focus:border-slate-500 text-white placeholder-gray-400 text-sm md:text-lg clip-corner uppercase disabled:opacity-50"
                 />
                 <button
                   onClick={saveScore}
-                  className="w-full px-6 py-3 md:py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-base md:text-lg shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 mx-auto clip-corner uppercase tracking-wider"
+                  disabled={isSaving}
+                  className="w-full px-4 py-2.5 md:px-6 md:py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-sm md:text-lg shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto clip-corner uppercase tracking-wider"
                 >
-                  <img src="/icon/leaderboard.png" alt="Save" className="w-5 h-5" />
-                  Save to Leaderboard
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin inline-block w-4 h-4 md:w-5 md:h-5 border-2 border-white border-t-transparent rounded-full" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <img src="/icon/leaderboard.png" alt="Save" className="w-4 h-4 md:w-5 md:h-5" />
+                      <span>Save Score</span>
+                    </>
+                  )}
                 </button>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center px-4">
                 <button
                   onClick={resetTest}
-                  className="px-8 md:px-10 py-3 md:py-4 bg-slate-700 hover:bg-slate-600 text-white text-base md:text-lg font-bold shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
+                  className="px-6 md:px-10 py-2.5 md:py-4 bg-slate-700 hover:bg-slate-600 text-white text-sm md:text-lg font-bold shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
                 >
-                  <img src="/icon/restart.png" alt="Restart" className="w-5 h-5" />
-                  Try Again
+                  <img src="/icon/restart.png" alt="Restart" className="w-4 h-4 md:w-5 md:h-5" />
+                  <span>Try Again</span>
                 </button>
                 <Link
                   href="/"
-                  className="px-8 md:px-10 py-3 md:py-4 bg-slate-800 border-l-4 border-slate-700 text-white text-base md:text-lg font-bold hover:bg-slate-700 hover:scale-105 transition-all duration-300 inline-flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
+                  className="px-6 md:px-10 py-2.5 md:py-4 bg-slate-800 border-l-4 border-slate-700 text-white text-sm md:text-lg font-bold hover:bg-slate-700 hover:scale-105 transition-all duration-300 inline-flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
                 >
-                  <img src="/icon/meteoricon.png" alt="Home" className="w-5 h-5" />
-                  Back to Home
+                  <img src="/icon/meteoricon.png" alt="Home" className="w-4 h-4 md:w-5 md:h-5" />
+                  <span>Home</span>
                 </Link>
               </div>
             </div>
           )}
 
-          {/* Leaderboard */}
-          <div className="mt-8 md:mt-10 bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-8 clip-corner-lg">
-            <h3 className="text-2xl md:text-3xl font-black mb-4 md:mb-6 text-center flex items-center justify-center gap-2 md:gap-3 flex-wrap uppercase tracking-wider">
-              <img src="/icon/leaderboard.png" alt="Leaderboard" className="w-8 h-8 md:w-10 md:h-10" />
-              <span className="text-sm md:text-base">Leaderboard - <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{config.name}</span></span>
+          {/* Leaderboard - Same as before but with break-words */}
+          <div className="mt-6 md:mt-10 bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-8 clip-corner-lg">
+            <h3 className="text-xl md:text-3xl font-black mb-3 md:mb-6 text-center flex flex-wrap items-center justify-center gap-2 uppercase tracking-wider px-4">
+              <img src="/icon/leaderboard.png" alt="Leaderboard" className="w-6 h-6 md:w-10 md:h-10 shrink-0" />
+              <span className="text-xs md:text-base break-words">Leaderboard - <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{config.name}</span></span>
             </h3>
             <div className="space-y-2 md:space-y-3">
               {leaderboard.length > 0 ? (
                 leaderboard.slice(0, 10).map((score, index) => (
                   <div
                     key={index}
-                    className={`flex flex-col md:flex-row items-start md:items-center justify-between p-3 md:p-4 ${
+                    className={`flex flex-col md:flex-row items-start md:items-center justify-between p-2.5 md:p-4 ${
                       index < 3 ? 'bg-slate-800/50 border-l-4 border-slate-400' : 'bg-slate-900/30 border-l-4 border-slate-700/30'
                     } hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner`}
                   >
                     <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0 w-full md:w-auto mb-2 md:mb-0">
-                      <div className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-black text-xl md:text-2xl shrink-0 clip-corner-sm ${
+                      <div className={`w-8 h-8 md:w-12 md:h-12 flex items-center justify-center font-black text-lg md:text-2xl shrink-0 clip-corner-sm ${
                         index < 3 ? 'bg-slate-700' : 'bg-slate-800'
                       }`}>
                         {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="font-bold text-sm md:text-lg text-white truncate uppercase tracking-wide">{score.name}</div>
-                        <div className="text-xs md:text-sm text-gray-400">{new Date(score.timestamp).toLocaleDateString()}</div>
+                        <div className="font-bold text-xs md:text-lg text-white truncate uppercase tracking-wide">{score.name}</div>
+                        <div className="text-[10px] md:text-sm text-gray-400">{new Date(score.timestamp).toLocaleDateString()}</div>
                       </div>
                     </div>
-                    <div className="flex gap-4 md:gap-6 items-center shrink-0 w-full md:w-auto justify-end">
+                    <div className="flex gap-3 md:gap-6 items-center shrink-0 w-full md:w-auto justify-end">
                       <div className="text-center">
-                        <div className="font-black text-lg md:text-2xl text-green-400">{score.wpm}</div>
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">WPM</div>
+                        <div className="font-black text-base md:text-2xl text-green-400">{score.wpm}</div>
+                        <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">WPM</div>
                       </div>
                       <div className="text-center">
-                        <div className="font-black text-lg md:text-2xl text-yellow-400">{score.accuracy}%</div>
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">ACC</div>
+                        <div className="font-black text-base md:text-2xl text-yellow-400">{score.accuracy}%</div>
+                        <div className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider">ACC</div>
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-center text-gray-400 uppercase tracking-wider">No scores yet. Be the first!</p>
+                <p className="text-center text-gray-400 uppercase tracking-wider text-xs md:text-base py-4 break-words px-4">No scores yet. Be the first!</p>
               )}
             </div>
           </div>
