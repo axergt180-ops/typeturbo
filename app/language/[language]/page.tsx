@@ -350,38 +350,59 @@ export default function TypingTestPage() {
     setIsSaving(true);
 
     try {
-      console.log('Saving score to:', `${leaderboardApiUrl}/leaderboard`);
-      console.log('Payload:', {
+      // Log request details
+      const apiUrl = `${leaderboardApiUrl}/leaderboard`;
+      const payload = {
         name: playerName.trim(),
         wpm: stats.wpm,
         accuracy: stats.accuracy,
         language: language
-      });
+      };
 
-      const response = await fetch(`${leaderboardApiUrl}/leaderboard`, {
+      console.log('=== SAVE SCORE DEBUG ===');
+      console.log('API URL:', apiUrl);
+      console.log('Payload:', payload);
+      console.log('Method: POST');
+      console.log('=======================');
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          name: playerName.trim(),
-          wpm: stats.wpm,
-          accuracy: stats.accuracy,
-          language: language
-        })
+        body: JSON.stringify(payload)
       });
 
       console.log('Response status:', response.status);
+      console.log('Response statusText:', response.statusText);
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
+      // Handle 404 specifically
+      if (response.status === 404) {
+        console.error('404 Error - Endpoint not found');
+        console.log('Expected endpoint:', apiUrl);
+        console.log('Make sure your API server is running and the endpoint exists');
+        
+        alert(`Failed to save score: API endpoint not found (HTTP 404)\n\n` +
+              `Endpoint: ${apiUrl}\n\n` +
+              `Please check:\n` +
+              `1. API server is running\n` +
+              `2. Endpoint /api/leaderboard exists\n` +
+              `3. CORS is configured correctly\n\n` +
+              `Contact support if the problem persists.`);
+        setIsSaving(false);
+        return;
+      }
+
       const responseText = await response.text();
-      console.log('Response text:', responseText);
+      console.log('Response body:', responseText);
 
       if (response.ok) {
         let result;
         try {
-          result = JSON.parse(responseText);
+          result = responseText ? JSON.parse(responseText) : {};
+          console.log('Parsed response:', result);
         } catch (e) {
           console.log('Response is not JSON, but request was successful');
         }
@@ -390,22 +411,30 @@ export default function TypingTestPage() {
         await loadLeaderboard();
         setPlayerName('');
       } else {
-        let errorMessage = 'Server error';
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorData = JSON.parse(responseText);
-          errorMessage = errorData.error || errorData.message || 'Unknown error';
+          errorMessage = errorData.error || errorData.message || errorMessage;
         } catch (e) {
-          errorMessage = responseText || `HTTP ${response.status}`;
+          if (responseText) {
+            errorMessage = responseText;
+          }
         }
         
         console.error('Save error:', errorMessage);
-        alert(`Failed to save score: ${errorMessage}\n\nPlease try again or contact support if the problem persists.`);
+        alert(`Failed to save score: ${errorMessage}\n\nPlease try again or contact support.`);
       }
     } catch (error) {
-      console.error('Error saving score:', error);
+      console.error('Exception during save:', error);
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        alert('Network error: Unable to connect to server.\n\nPlease check:\n- Your internet connection\n- Server is running\n- API URL is correct\n\nCurrent API: ' + leaderboardApiUrl);
+        alert(`Network error: Unable to connect to server.\n\n` +
+              `Current API: ${leaderboardApiUrl}\n\n` +
+              `Please check:\n` +
+              `- Your internet connection\n` +
+              `- API server is running\n` +
+              `- No firewall blocking requests\n\n` +
+              `Error: ${error.message}`);
       } else {
         alert(`Failed to save score: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again.`);
       }
