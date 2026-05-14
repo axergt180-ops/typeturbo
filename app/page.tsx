@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/static-components, react-hooks/set-state-in-effect */
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -29,6 +31,7 @@ export default function Homepage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [showLanguageDropdown, setShowLanguageDropdown] = useState<boolean>(false);
+  const [isNavScrolled, setIsNavScrolled] = useState(false);
   
   const totalPages = 3;
 
@@ -75,10 +78,6 @@ export default function Homepage() {
     'hindi'
   ];
 
-  useEffect(() => {
-    loadLeaderboard(activeLeaderboardTab);
-  }, [activeLeaderboardTab]);
-
   // Track mouse position for interactive effects
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -86,6 +85,13 @@ export default function Homepage() {
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => setIsNavScrolled(window.scrollY > 24);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Close dropdown when clicking outside
@@ -100,7 +106,7 @@ export default function Homepage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLanguageDropdown]);
 
-  const loadLeaderboard = async (tab: string) => {
+  async function loadLeaderboard(tab: string) {
     try {
       setLoading(true);
       const apiUrl = process.env.NEXT_PUBLIC_TYPEMETEOR_API_URL || 'https://typemeteor.sbs/api';
@@ -185,7 +191,11 @@ export default function Homepage() {
       setLeaderboard([]);
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    loadLeaderboard(activeLeaderboardTab);
+  }, [activeLeaderboardTab]);
 
   const scrollToSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -212,10 +222,10 @@ export default function Homepage() {
         onMouseLeave={() => setHoveredCard(null)}
         className={`p-6 md:p-8 text-center cursor-pointer relative group transition-all duration-200 clip-corner overflow-hidden
           ${isSelected 
-            ? 'bg-slate-800/90 border-2 border-slate-400 shadow-[0_0_40px_rgba(148,163,184,0.4)]' 
+            ? 'bg-white/[0.08] border-2 border-blue-300/70 shadow-[0_24px_80px_rgba(37,99,235,0.24)]' 
             : isHovered
-            ? 'bg-slate-800/60 border border-slate-500 -translate-y-1'
-            : 'bg-slate-900/40 border border-slate-700/50'
+            ? 'bg-white/[0.06] border border-blue-200/40 -translate-y-1 shadow-[0_18px_55px_rgba(15,23,42,0.35)]'
+            : 'bg-white/[0.035] border border-white/10 shadow-[0_16px_45px_rgba(2,6,23,0.2)]'
           }`}
       >
         {/* Scan line effect only on hover, not on selected */}
@@ -227,7 +237,7 @@ export default function Homepage() {
         
         {/* Static glow for selected */}
         {isSelected && (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-600/20 via-transparent to-slate-600/20 pointer-events-none"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/15 via-transparent to-indigo-500/15 pointer-events-none"></div>
         )}
         
         <div className={`mb-3 md:mb-4 transform transition-all duration-200 ${isSelected ? 'scale-105' : isHovered ? 'scale-110' : 'scale-100'}`}>
@@ -257,11 +267,11 @@ export default function Homepage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#07111f] text-white overflow-x-hidden">
       {/* Animated Background with mouse-following effect */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div 
-          className="absolute w-96 h-96 bg-slate-700/10 blur-3xl animate-pulse transition-transform duration-1000" 
+          className="absolute w-96 h-96 bg-blue-500/15 blur-3xl animate-pulse transition-transform duration-1000" 
           style={{ 
             animationDuration: '8s',
             transform: `translate(${mousePosition.x / 50}px, ${mousePosition.y / 50}px)`,
@@ -270,7 +280,7 @@ export default function Homepage() {
           }} 
         />
         <div 
-          className="absolute w-96 h-96 bg-slate-600/10 blur-3xl animate-pulse transition-transform duration-1000" 
+          className="absolute w-96 h-96 bg-indigo-500/12 blur-3xl animate-pulse transition-transform duration-1000" 
           style={{ 
             animationDuration: '8s', 
             animationDelay: '2s',
@@ -280,7 +290,7 @@ export default function Homepage() {
           }} 
         />
         <div 
-          className="absolute w-96 h-96 bg-slate-800/10 blur-3xl animate-pulse transition-transform duration-1000" 
+          className="absolute w-96 h-96 bg-cyan-500/10 blur-3xl animate-pulse transition-transform duration-1000" 
           style={{ 
             animationDuration: '8s', 
             animationDelay: '4s',
@@ -294,13 +304,16 @@ export default function Homepage() {
       {/* Custom CSS for animations */}
       <style jsx global>{`
         .clip-corner {
-          clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+          clip-path: none;
+          border-radius: 1.25rem;
         }
         .clip-corner-sm {
-          clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+          clip-path: none;
+          border-radius: 0.9rem;
         }
         .clip-corner-lg {
-          clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 0 100%);
+          clip-path: none;
+          border-radius: 1.75rem;
         }
         
         @keyframes scanline {
@@ -365,7 +378,7 @@ export default function Homepage() {
           content: '';
           position: absolute;
           inset: 0;
-          background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(148, 163, 184, 0.1), transparent 40%);
+          background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(96, 165, 250, 0.12), transparent 40%);
           opacity: 0;
           transition: opacity 0.3s;
           pointer-events: none;
@@ -401,14 +414,15 @@ export default function Homepage() {
 
       <div className="relative">
         {/* Navigation - NO FLOAT ON LOGO */}
-        <nav className="sticky top-0 z-50 px-4 md:px-6 pt-6 backdrop-blur-sm">
+        <nav className={`sticky top-0 z-50 px-4 md:px-6 backdrop-blur-xl transition-all duration-300 ${isNavScrolled ? 'pt-3' : 'pt-5'}`}>
           <div className="container mx-auto">
-            <div className="bg-slate-900/95 border-b-2 border-slate-700/50 px-4 md:px-6 py-3 flex justify-between items-center shadow-lg shadow-black/20 clip-corner pulse-glow">
+            <div className={`border border-white/10 px-4 md:px-6 flex justify-between items-center clip-corner transition-all duration-300 ${isNavScrolled ? 'bg-[#07111f]/90 py-2 shadow-[0_18px_60px_rgba(2,6,23,0.42)]' : 'bg-white/[0.065] py-3 shadow-[0_18px_60px_rgba(2,6,23,0.28)]'}`}>
               <div className="flex items-center gap-3 slide-in-left">
-                <div className="w-10 h-10 flex items-center justify-center bg-slate-800 shadow-md clip-corner-sm">
-                  <img src="/icon/meteoricon.png" alt="Typemeteor Icon" className="w-6 h-6" />
+                <div className={`relative flex items-center justify-center overflow-hidden bg-linear-to-br from-white/18 via-blue-400/16 to-indigo-500/18 shadow-md ring-1 ring-white/15 clip-corner-sm transition-all duration-300 ${isNavScrolled ? 'w-9 h-9' : 'w-11 h-11'}`}>
+                  <div className="absolute inset-1 rounded-xl border border-white/10" />
+                  <img src="/icon/meteoricon.png" alt="Typemeteor Icon" className={`relative object-contain drop-shadow-[0_4px_12px_rgba(96,165,250,0.35)] transition-all duration-300 ${isNavScrolled ? 'w-5 h-5' : 'w-6 h-6'}`} />
                 </div>
-                <h1 className="text-xl md:text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-[0.2em] glitch">
+                <h1 className={`font-black bg-linear-to-r from-white to-blue-200 bg-clip-text text-transparent transition-all duration-300 ${isNavScrolled ? 'text-lg md:text-xl tracking-[0.12em]' : 'text-xl md:text-2xl tracking-[0.16em]'}`}>
                   TYPEMETEOR
                 </h1>
               </div>
@@ -422,7 +436,7 @@ export default function Homepage() {
                 <button onClick={() => scrollToSection('leaderboard')} className="text-gray-300 hover:text-white transition-all duration-300 hover:scale-110 hover:tracking-widest">
                   Leaderboard
                 </button>
-                <button onClick={scrollToLanguages} className="bg-slate-700 hover:bg-slate-600 px-5 py-2.5 font-semibold shadow-md transition-all duration-300 clip-corner-sm hover:scale-110 hover:shadow-lg hover:shadow-slate-600/50">
+                <button onClick={scrollToLanguages} className="bg-blue-500 hover:bg-blue-400 px-5 py-2.5 font-semibold shadow-[0_14px_35px_rgba(37,99,235,0.3)] transition-all duration-300 clip-corner-sm hover:-translate-y-0.5">
                   Start Test
                 </button>
               </div>
@@ -440,16 +454,16 @@ export default function Homepage() {
             backgroundAttachment: 'fixed'
           }}
         >
-          <div className="absolute inset-0 bg-linear-to-t from-slate-950 via-slate-900/90 to-slate-950/50" />
+            <div className="absolute inset-0 bg-linear-to-t from-[#07111f] via-[#07111f]/88 to-[#07111f]/45" />
           
           <div className="relative z-10 w-full max-w-6xl flex flex-col gap-10">
             {/* Logo */}
             <div className="flex justify-center fade-in-up">
-              <div className="bg-slate-900/90 border-l-4 border-slate-600 px-10 py-6 md:px-16 md:py-8 shadow-[0_25px_60px_rgba(0,0,0,0.5)] flex flex-col items-center gap-4 clip-corner-lg hover:border-slate-400 transition-all duration-300 hover:shadow-[0_35px_80px_rgba(0,0,0,0.7)]">
+              <div className="bg-white/[0.075] border border-white/12 px-10 py-6 md:px-16 md:py-8 shadow-[0_28px_90px_rgba(2,6,23,0.55)] backdrop-blur-xl flex flex-col items-center gap-4 clip-corner-lg transition-all duration-300">
                 <div className="flex items-center gap-3 md:gap-4">
                   <img src="/icon/meteoricon.png" alt="Meteor Icon" className="w-12 h-12 rotate-in" />
-                  <span className="text-3xl md:text-5xl font-black tracking-[0.2em] uppercase">
-                    TYPE<span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">METEOR</span>
+                    <span className="text-3xl md:text-5xl font-black tracking-[0.16em] uppercase">
+                    TYPE<span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">METEOR</span>
                   </span>
                 </div>
                 <p className="text-xs md:text-sm tracking-[0.35em] uppercase text-gray-400 text-center shimmer">
@@ -460,7 +474,7 @@ export default function Homepage() {
 
             {/* Banner */}
             <div className="flex justify-center fade-in-up stagger-1">
-              <div className="bg-slate-700 px-8 md:px-16 py-3 md:py-4 shadow-[0_18px_40px_rgba(0,0,0,0.4)] clip-corner hover:bg-slate-600 transition-all duration-300 hover:scale-105">
+              <div className="bg-blue-500/90 px-8 md:px-16 py-3 md:py-4 shadow-[0_18px_45px_rgba(37,99,235,0.28)] clip-corner transition-all duration-300">
                 <p className="text-sm md:text-xl font-black tracking-[0.35em] md:tracking-[0.5em] uppercase text-center">
                   Free Typing · typemeteor
                 </p>
@@ -471,7 +485,7 @@ export default function Homepage() {
             <div className="flex flex-col md:flex-row justify-center gap-4 md:gap-6 max-w-3xl mx-auto w-full fade-in-up stagger-2">
               <button
                 onClick={scrollToLanguages}
-                className="flex-1 bg-slate-900/90 border-l-4 border-slate-600 px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:border-slate-500 hover:bg-slate-800/90 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)] clip-corner group hover:scale-105">
+                className="flex-1 bg-white/[0.07] border border-white/10 px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:border-blue-300/45 hover:bg-white/[0.1] transition-all duration-300 shadow-[0_18px_50px_rgba(2,6,23,0.3)] clip-corner group hover:-translate-y-1">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
                     <img src="/icon/meteoricon.png" alt="Restart Icon" className="w-8 h-8" />
@@ -487,7 +501,7 @@ export default function Homepage() {
 
               <button
                 onClick={() => scrollToSection('leaderboard')}
-                className="flex-1 bg-slate-700 text-white px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:bg-slate-600 transition-all duration-300 shadow-[0_18px_40px_rgba(0,0,0,0.3)] clip-corner group hover:scale-105">
+                className="flex-1 bg-blue-500 text-white px-6 md:px-10 py-4 md:py-6 flex items-center justify-between hover:bg-blue-400 transition-all duration-300 shadow-[0_18px_50px_rgba(37,99,235,0.28)] clip-corner group hover:-translate-y-1">
                 <div className="text-left">
                   <p className="text-[11px] md:text-xs uppercase tracking-[0.25em] text-gray-300 group-hover:text-white transition-colors">
                     Ranking Area
@@ -507,7 +521,7 @@ export default function Homepage() {
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16 fade-in-up">
               <h3 className="text-4xl md:text-5xl font-black mb-4 uppercase tracking-wider">
-                Why Choose <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Typemeteor?</span>
+                Why Choose <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">Typemeteor?</span>
               </h3>
               <p className="text-xl text-gray-400 max-w-2xl mx-auto">
                 Everything you need to improve your typing skills in one place
@@ -522,10 +536,10 @@ export default function Homepage() {
               ].map((feature, i) => (
                 <div 
                   key={i} 
-                  className="bg-slate-900/50 border-l-4 border-slate-700 p-8 hover:bg-slate-800/50 hover:border-slate-500 hover:-translate-y-2 transition-all duration-300 cursor-pointer clip-corner interactive-card group fade-in-up"
+                  className="bg-white/[0.045] border border-white/10 p-8 hover:bg-white/[0.075] hover:border-blue-300/40 hover:-translate-y-2 transition-all duration-300 cursor-pointer clip-corner interactive-card group fade-in-up shadow-[0_18px_55px_rgba(2,6,23,0.22)]"
                   style={{ animationDelay: feature.delay }}
                 >
-                  <div className="w-16 h-16 bg-slate-800 flex items-center justify-center mb-6 shadow-md clip-corner-sm group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                  <div className="w-16 h-16 bg-white/10 flex items-center justify-center mb-6 shadow-md ring-1 ring-white/10 clip-corner-sm group-hover:scale-105 transition-all duration-300">
                     <img src={feature.icon} alt={feature.title} className="w-8 h-8" />
                   </div>
                   <h4 className="text-2xl font-bold mb-4 text-white uppercase tracking-wide group-hover:text-slate-200 transition-colors">{feature.title}</h4>
@@ -537,11 +551,11 @@ export default function Homepage() {
         </section>
 
         {/* Language Selection */}
-        <section id="languages" className="py-24 px-6 bg-linear-to-b from-transparent to-slate-900/50">
+        <section id="languages" className="py-24 px-6 bg-linear-to-b from-transparent to-blue-950/20">
           <div className="container mx-auto max-w-7xl">
             <div className="text-center mb-16 fade-in-up">
               <h3 className="text-4xl md:text-5xl font-black mb-4 uppercase tracking-wider">
-                Choose Your <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Language</span>
+                Choose Your <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">Language</span>
               </h3>
               <p className="text-xl text-gray-400">
                 Select from 17 languages and start improving your typing speed
@@ -557,7 +571,7 @@ export default function Homepage() {
                   }
                 }}
                 disabled={currentPage === 0}
-                className={`hidden lg:flex absolute -left-20 top-1/2 -translate-y-1/2 w-16 h-16 bg-slate-900/50 border-2 border-slate-700/50 items-center justify-center transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg z-10 clip-corner-sm ${currentPage === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'}`}>
+                className={`hidden lg:flex absolute -left-20 top-1/2 -translate-y-1/2 w-16 h-16 bg-white/[0.06] border border-white/10 items-center justify-center transition-all hover:bg-white/[0.1] hover:border-blue-300/40 shadow-lg z-10 clip-corner-sm ${currentPage === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-blue-500/20'}`}>
                 <img src="/icon/left-arrow.png" alt="Previous" className="w-6 h-6" />
               </button>
 
@@ -608,7 +622,7 @@ export default function Homepage() {
                   }
                 }}
                 disabled={currentPage === totalPages - 1}
-                className={`hidden lg:flex absolute -right-20 top-1/2 -translate-y-1/2 w-16 h-16 bg-slate-900/50 border-2 border-slate-700/50 items-center justify-center transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg z-10 clip-corner-sm ${currentPage === totalPages - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'}`}>
+                className={`hidden lg:flex absolute -right-20 top-1/2 -translate-y-1/2 w-16 h-16 bg-white/[0.06] border border-white/10 items-center justify-center transition-all hover:bg-white/[0.1] hover:border-blue-300/40 shadow-lg z-10 clip-corner-sm ${currentPage === totalPages - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-blue-500/20'}`}>
                 <img src="/icon/right-arrow.png" alt="Next" className="w-6 h-6" />
               </button>
 
@@ -620,8 +634,8 @@ export default function Homepage() {
                     onClick={() => setCurrentPage(page)}
                     className={`h-3 transition-all duration-300 ${
                       currentPage === page 
-                        ? 'w-8 bg-slate-500' 
-                        : 'w-3 bg-slate-700/50 hover:bg-slate-600/50'
+                        ? 'w-8 bg-blue-400' 
+                        : 'w-3 bg-white/20 hover:bg-white/35'
                     }`}
                   />
                 ))}
@@ -633,13 +647,13 @@ export default function Homepage() {
               <div className="text-center mt-12 fade-in-up">
                 <Link 
                   href={`/language/${selectedLanguage}`}
-                  className="bg-slate-700 hover:bg-slate-600 px-16 py-6 font-bold text-2xl shadow-xl transition-all duration-300 inline-flex items-center gap-3 hover:scale-110 clip-corner uppercase tracking-wider pulse-glow"
+                  className="bg-blue-500 hover:bg-blue-400 px-16 py-6 font-bold text-2xl shadow-[0_20px_55px_rgba(37,99,235,0.32)] transition-all duration-300 inline-flex items-center gap-3 hover:-translate-y-1 clip-corner uppercase tracking-wider"
                 >
                   <span>Start 1-Minute Test</span>
                   <img src="/icon/right-arrow.png" alt="Arrow" className="w-6 h-6" />
                 </Link>
                 <p className="text-gray-400 mt-4 text-lg">
-                  Click to begin your typing test in <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent font-bold">{languageNames[selectedLanguage]}</span>
+                  Click to begin your typing test in <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent font-bold">{languageNames[selectedLanguage]}</span>
                 </p>
               </div>
             )}
@@ -647,14 +661,14 @@ export default function Homepage() {
         </section>
 
         {/* Leaderboard Section with Dropdown */}
-        <section id="leaderboard" className="py-24 px-6 bg-linear-to-b from-slate-900/50 to-transparent">
+        <section id="leaderboard" className="py-24 px-6 bg-linear-to-b from-blue-950/20 to-transparent">
           <div className="container mx-auto max-w-6xl">
             <div className="text-center mb-16 fade-in-up">
               <h3 className="text-4xl md:text-5xl font-black mb-4 uppercase tracking-wider">
-                Global <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Leaderboard</span>
+                Global <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">Leaderboard</span>
               </h3>
               <p className="text-xl text-gray-400">
-                See how you rank against the world's fastest typists
+                See how you rank against the world&apos;s fastest typists
               </p>
             </div>
             
@@ -670,8 +684,8 @@ export default function Homepage() {
                     }
                   }}
                   disabled={languageTabs.indexOf(activeLeaderboardTab) === 0}
-                  className={`w-12 h-12 flex items-center justify-center bg-slate-900/50 border-2 border-slate-700/50 transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg clip-corner-sm ${
-                    languageTabs.indexOf(activeLeaderboardTab) === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'
+                  className={`w-12 h-12 flex items-center justify-center bg-white/[0.06] border border-white/10 transition-all hover:bg-white/[0.1] hover:border-blue-300/40 shadow-lg clip-corner-sm ${
+                    languageTabs.indexOf(activeLeaderboardTab) === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-blue-500/20'
                   }`}
                 >
                   <img src="/icon/left-arrow.png" alt="Previous" className="w-5 h-5" />
@@ -680,7 +694,7 @@ export default function Homepage() {
                 <div className="relative language-dropdown-container">
                   <button
                     onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
-                    className="bg-slate-900/50 px-8 py-3 font-bold uppercase tracking-wider clip-corner-sm min-w-[200px] text-center border-l-4 border-slate-700 hover:bg-slate-800/50 hover:border-slate-600 transition-all flex items-center justify-between gap-3"
+                    className="bg-white/[0.06] px-8 py-3 font-bold uppercase tracking-wider clip-corner-sm min-w-[200px] text-center border border-white/10 hover:bg-white/[0.1] hover:border-blue-300/40 transition-all flex items-center justify-between gap-3"
                   >
                     <span className="text-white">{languageNames[activeLeaderboardTab]}</span>
                     <svg 
@@ -694,7 +708,7 @@ export default function Homepage() {
                   </button>
                   
                   {showLanguageDropdown && (
-                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[90vw] max-w-[600px] bg-slate-900/98 border-2 border-slate-700 shadow-xl z-50 clip-corner backdrop-blur-sm max-h-[400px] overflow-y-auto">
+                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-[90vw] max-w-[600px] bg-[#0b1424]/95 border border-white/10 shadow-xl z-50 clip-corner backdrop-blur-xl max-h-[400px] overflow-y-auto">
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-1 p-2">
                         {languageTabs.map((tab) => (
                           <button
@@ -726,8 +740,8 @@ export default function Homepage() {
                     }
                   }}
                   disabled={languageTabs.indexOf(activeLeaderboardTab) === languageTabs.length - 1}
-                  className={`w-12 h-12 flex items-center justify-center bg-slate-900/50 border-2 border-slate-700/50 transition-all hover:bg-slate-800/50 hover:border-slate-600 hover:scale-110 shadow-lg clip-corner-sm ${
-                    languageTabs.indexOf(activeLeaderboardTab) === languageTabs.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-slate-600/50'
+                  className={`w-12 h-12 flex items-center justify-center bg-white/[0.06] border border-white/10 transition-all hover:bg-white/[0.1] hover:border-blue-300/40 shadow-lg clip-corner-sm ${
+                    languageTabs.indexOf(activeLeaderboardTab) === languageTabs.length - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:shadow-blue-500/20'
                   }`}
                 >
                   <img src="/icon/right-arrow.png" alt="Next" className="w-5 h-5" />
@@ -735,7 +749,7 @@ export default function Homepage() {
               </div>
             </div>
 
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-6 md:p-8 clip-corner-lg">
+            <div className="bg-white/[0.045] border border-white/10 p-6 md:p-8 clip-corner-lg shadow-[0_22px_70px_rgba(2,6,23,0.26)]">
               {loading ? (
                 <div className="text-center py-12">
                   <div className="animate-spin inline-block w-12 h-12 border-4 border-slate-600 border-t-slate-400 mb-4"></div>
@@ -747,8 +761,8 @@ export default function Homepage() {
                     <div
                       key={i}
                       className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:p-5 border-l-4 transition-all duration-300 clip-corner interactive-card group fade-in-up stagger-${i + 1}
-                        ${i < 3 ? 'bg-slate-800/60 border-slate-400' : 'bg-slate-900/30 border-slate-700/30'} 
-                        hover:bg-slate-700/40 hover:border-slate-500 hover:-translate-y-1 hover:shadow-lg`}
+                        ${i < 3 ? 'bg-blue-500/12 border-blue-300/70' : 'bg-white/[0.035] border-white/10'} 
+                        hover:bg-white/[0.075] hover:border-blue-300/45 hover:-translate-y-1 hover:shadow-lg`}
                     >
                       <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0 w-full md:w-auto mb-3 md:mb-0">
                         <div className={`w-10 h-10 md:w-12 md:h-12 flex items-center justify-center font-black text-xl md:text-2xl shrink-0 clip-corner-sm transition-all duration-300 count-up

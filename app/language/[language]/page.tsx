@@ -16,9 +16,16 @@ interface TypingStats {
 }
 
 interface LeaderboardAPIResponse {
-  scores: any[];
+  scores: LeaderboardScore[];
   language: string;
   total: number;
+}
+
+interface LeaderboardScore {
+  name: string;
+  wpm: number;
+  accuracy: number;
+  timestamp: string;
 }
 
 interface TypedWord {
@@ -73,18 +80,26 @@ export default function TypingTestPage() {
   });
   const [isActive, setIsActive] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardScore[]>([]);
   const [playerName, setPlayerName] = useState('');
   const [rows, setRows] = useState<number[][]>([]);
   const [currentVisibleRow, setCurrentVisibleRow] = useState(0);
   const [wordsLoading, setWordsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isNavScrolled, setIsNavScrolled] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const config = languageConfig[language];
   const wordsPerRow = 10;
+
+  useEffect(() => {
+    const handleScroll = () => setIsNavScrolled(window.scrollY > 24);
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Load words on mount
   useEffect(() => {
@@ -547,37 +562,41 @@ export default function TypingTestPage() {
   const visibleRows = rows.slice(startRow, endRow);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-[#07111f] text-white">
       {/* Animated Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute w-96 h-96 bg-slate-700/10 blur-3xl animate-pulse" style={{ animationDuration: '8s', top: 0, left: '-12rem' }} />
-        <div className="absolute w-96 h-96 bg-slate-600/10 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s', bottom: 0, right: '-12rem' }} />
-        <div className="absolute w-96 h-96 bg-slate-800/10 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '4s', top: '50%', left: '50%' }} />
+        <div className="absolute w-96 h-96 bg-blue-500/15 blur-3xl animate-pulse" style={{ animationDuration: '8s', top: 0, left: '-12rem' }} />
+        <div className="absolute w-96 h-96 bg-indigo-500/12 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s', bottom: 0, right: '-12rem' }} />
+        <div className="absolute w-96 h-96 bg-cyan-500/10 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '4s', top: '50%', left: '50%' }} />
       </div>
 
       {/* Custom CSS */}
       <style jsx global>{`
         .clip-corner {
-          clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+          clip-path: none;
+          border-radius: 1.25rem;
         }
         .clip-corner-sm {
-          clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+          clip-path: none;
+          border-radius: 0.9rem;
         }
         .clip-corner-lg {
-          clip-path: polygon(0 0, calc(100% - 30px) 0, 100% 30px, 100% 100%, 0 100%);
+          clip-path: none;
+          border-radius: 1.75rem;
         }
       `}</style>
 
       <div className="relative">
         {/* Navigation */}
-        <nav className="sticky top-0 z-50 px-4 md:px-6 pt-6 backdrop-blur-sm">
+        <nav className={`sticky top-0 z-50 px-4 md:px-6 backdrop-blur-xl transition-all duration-300 ${isNavScrolled ? 'pt-3' : 'pt-5'}`}>
           <div className="container mx-auto">
-            <div className="bg-slate-900/95 border-b-2 border-slate-700/50 px-4 md:px-6 py-3 flex justify-between items-center shadow-lg shadow-black/20 clip-corner">
+            <div className={`border border-white/10 px-4 md:px-6 flex justify-between items-center clip-corner transition-all duration-300 ${isNavScrolled ? 'bg-[#07111f]/90 py-2 shadow-[0_18px_60px_rgba(2,6,23,0.42)]' : 'bg-white/[0.065] py-3 shadow-[0_18px_60px_rgba(2,6,23,0.28)]'}`}>
               <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition">
-                <div className="w-10 h-10 flex items-center justify-center bg-slate-800 shadow-md clip-corner-sm">
-                  <img src="/icon/meteoricon.png" alt="Typemeteor" className="w-6 h-6" />
+                <div className={`relative flex items-center justify-center overflow-hidden bg-linear-to-br from-white/18 via-blue-400/16 to-indigo-500/18 shadow-md ring-1 ring-white/15 clip-corner-sm transition-all duration-300 ${isNavScrolled ? 'w-9 h-9' : 'w-11 h-11'}`}>
+                  <div className="absolute inset-1 rounded-xl border border-white/10" />
+                  <img src="/icon/meteoricon.png" alt="Typemeteor" className={`relative object-contain drop-shadow-[0_4px_12px_rgba(96,165,250,0.35)] transition-all duration-300 ${isNavScrolled ? 'w-5 h-5' : 'w-6 h-6'}`} />
                 </div>
-                <h1 className="text-xl md:text-2xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent tracking-[0.2em]">
+                <h1 className={`font-black bg-linear-to-r from-white to-blue-200 bg-clip-text text-transparent transition-all duration-300 ${isNavScrolled ? 'text-lg md:text-xl tracking-[0.12em]' : 'text-xl md:text-2xl tracking-[0.16em]'}`}>
                   TYPEMETEOR
                 </h1>
               </Link>
@@ -596,22 +615,22 @@ export default function TypingTestPage() {
               <img src={config.flag} alt={`${config.name} Flag`} className="w-16 h-16 md:w-24 md:h-24 mx-auto object-contain" />
             </div>
             <h2 className="text-2xl md:text-4xl font-black mb-2 uppercase tracking-wider break-words px-4">
-              <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{config.name}</span> Typing Test
+              <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">{config.name}</span> Typing Test
             </h2>
             <p className="text-base md:text-xl text-gray-400 uppercase tracking-wide px-4 break-words">1 minute test - Type as many words as you can!</p>
           </div>
 
           {/* Stats Bar */}
           <div className="grid grid-cols-3 gap-2 md:gap-4 mb-6">
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
+            <div className="bg-white/[0.045] border border-white/10 p-3 md:p-6 text-center hover:border-blue-300/40 hover:-translate-y-1 transition-all clip-corner shadow-[0_18px_55px_rgba(2,6,23,0.2)]">
               <div className="mb-2">
                 <img src="/icon/clock.png" alt="Time" className="w-8 h-8 md:w-12 md:h-12 mx-auto" />
               </div>
-              <div className="text-xl md:text-4xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{stats.timeLeft}</div>
+              <div className="text-xl md:text-4xl font-black bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">{stats.timeLeft}</div>
               <div className="text-[10px] md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider break-words">Time</div>
             </div>
             
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
+            <div className="bg-white/[0.045] border border-white/10 p-3 md:p-6 text-center hover:border-blue-300/40 hover:-translate-y-1 transition-all clip-corner shadow-[0_18px_55px_rgba(2,6,23,0.2)]">
               <div className="mb-2">
                 <img src="/icon/wpm.png" alt="WPM" className="w-8 h-8 md:w-12 md:h-12 mx-auto" />
               </div>
@@ -619,7 +638,7 @@ export default function TypingTestPage() {
               <div className="text-[10px] md:text-sm text-gray-400 font-medium mt-1 uppercase tracking-wider">WPM</div>
             </div>
             
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-6 text-center hover:border-slate-600 hover:-translate-y-1 transition-all clip-corner">
+            <div className="bg-white/[0.045] border border-white/10 p-3 md:p-6 text-center hover:border-blue-300/40 hover:-translate-y-1 transition-all clip-corner shadow-[0_18px_55px_rgba(2,6,23,0.2)]">
               <div className="mb-2">
                 <img src="/icon/accuracy.png" alt="Accuracy" className="w-8 h-8 md:w-12 md:h-12 mx-auto" />
               </div>
@@ -630,9 +649,9 @@ export default function TypingTestPage() {
 
           {!isFinished ? (
             // Test Area
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-8 clip-corner-lg">
+            <div className="bg-white/[0.045] border border-white/10 p-3 md:p-8 clip-corner-lg shadow-[0_24px_75px_rgba(2,6,23,0.28)]">
               {/* Words Display - Desktop unchanged, Mobile optimized */}
-              <div className="mb-4 md:mb-6 p-3 md:p-6 lg:p-8 bg-slate-800/50 min-h-[200px] md:min-h-[280px] lg:min-h-[320px] flex items-center justify-center overflow-hidden clip-corner">
+              <div className="mb-4 md:mb-6 p-3 md:p-6 lg:p-8 bg-[#0d1a2c]/80 border border-white/10 min-h-[200px] md:min-h-[280px] lg:min-h-[320px] flex items-center justify-center overflow-hidden clip-corner">
                 {wordsLoading ? (
                   <div className="text-center">
                     <div className="animate-spin inline-block w-8 h-8 border-4 border-slate-600 border-t-transparent mb-4" />
@@ -681,7 +700,7 @@ export default function TypingTestPage() {
                 onKeyDown={handleKeyDown}
                 placeholder="Start typing..."
                 disabled={wordsLoading || words.length === 0}
-                className="w-full p-3 md:p-5 text-base md:text-xl bg-slate-800 border-2 border-slate-600 focus:outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-500/20 transition-all text-white placeholder-gray-500 disabled:opacity-50 disabled:cursor-not-allowed clip-corner"
+                className="w-full p-3 md:p-5 text-base md:text-xl bg-[#0d1a2c] border border-white/10 focus:outline-none focus:border-blue-300/60 focus:ring-4 focus:ring-blue-500/15 transition-all text-white placeholder-gray-500 disabled:opacity-50 disabled:cursor-not-allowed clip-corner"
                 autoComplete="off"
                 autoFocus
               />
@@ -705,7 +724,7 @@ export default function TypingTestPage() {
               <button
                 onClick={resetTest}
                 disabled={wordsLoading}
-                className="mt-4 md:mt-6 mx-auto flex items-center gap-2 px-5 md:px-8 py-2.5 md:py-4 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm md:text-lg shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed clip-corner-sm uppercase tracking-wider"
+                className="mt-4 md:mt-6 mx-auto flex items-center gap-2 px-5 md:px-8 py-2.5 md:py-4 bg-blue-500 hover:bg-blue-400 text-white font-bold text-sm md:text-lg shadow-[0_18px_45px_rgba(37,99,235,0.28)] transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed clip-corner-sm uppercase tracking-wider"
               >
                 <img src="/icon/restart.png" alt="Restart" className="w-4 h-4 md:w-5 md:h-5" />
                 <span>Restart</span>
@@ -713,35 +732,35 @@ export default function TypingTestPage() {
             </div>
           ) : (
             // Results Screen - Same as before but with break-words
-            <div className="bg-slate-900/50 border-l-4 border-slate-700 p-4 md:p-10 text-center clip-corner-lg">
+            <div className="bg-white/[0.045] border border-white/10 p-4 md:p-10 text-center clip-corner-lg shadow-[0_24px_75px_rgba(2,6,23,0.28)]">
               <div className="mb-6">
                 <img src="/icon/meteoricon.png" alt="Complete" className="w-16 h-16 md:w-24 md:h-24 mx-auto" />
               </div>
               <h2 className="text-2xl md:text-4xl font-black mb-2 uppercase tracking-wider break-words px-4">
-                <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">Test Complete!</span>
+                <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">Test Complete!</span>
               </h2>
-              <p className="text-gray-400 mb-6 md:mb-8 text-xs md:text-base uppercase tracking-wider px-4 break-words">Here's how you performed</p>
+              <p className="text-gray-400 mb-6 md:mb-8 text-xs md:text-base uppercase tracking-wider px-4 break-words">Here&apos;s how you performed</p>
               
               <div className="grid grid-cols-2 gap-2 md:gap-6 mb-6 md:mb-10 max-w-2xl mx-auto">
-                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                <div className="p-3 md:p-6 bg-white/[0.04] border border-white/10 hover:bg-white/[0.075] hover:border-blue-300/40 transition-all duration-300 clip-corner">
                   <img src="/icon/wpm.png" alt="WPM" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
-                  <div className="text-3xl md:text-5xl font-black bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent mb-1 md:mb-2">{stats.wpm}</div>
+                  <div className="text-3xl md:text-5xl font-black bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent mb-1 md:mb-2">{stats.wpm}</div>
                   <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">WPM</div>
                 </div>
                 
-                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                <div className="p-3 md:p-6 bg-white/[0.04] border border-white/10 hover:bg-white/[0.075] hover:border-blue-300/40 transition-all duration-300 clip-corner">
                   <img src="/icon/accuracy.png" alt="Accuracy" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
                   <div className="text-3xl md:text-5xl font-black text-green-400 mb-1 md:mb-2">{stats.accuracy}%</div>
                   <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">Accuracy</div>
                 </div>
                 
-                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                <div className="p-3 md:p-6 bg-white/[0.04] border border-white/10 hover:bg-white/[0.075] hover:border-blue-300/40 transition-all duration-300 clip-corner">
                   <img src="/icon/competition.png" alt="Correct" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
                   <div className="text-3xl md:text-5xl font-black text-yellow-400 mb-1 md:mb-2">{stats.correctWords}</div>
                   <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">Correct</div>
                 </div>
                 
-                <div className="p-3 md:p-6 bg-slate-800/30 border-l-4 border-slate-700 hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner">
+                <div className="p-3 md:p-6 bg-white/[0.04] border border-white/10 hover:bg-white/[0.075] hover:border-blue-300/40 transition-all duration-300 clip-corner">
                   <img src="/icon/analytics.png" alt="Wrong" className="w-10 h-10 md:w-12 md:h-12 mx-auto mb-2 md:mb-3" />
                   <div className="text-3xl md:text-5xl font-black text-red-400 mb-1 md:mb-2">{stats.incorrectWords}</div>
                   <div className="text-gray-300 font-medium text-xs md:text-base uppercase tracking-wider break-words">Wrong</div>
@@ -749,7 +768,7 @@ export default function TypingTestPage() {
               </div>
 
               {/* Performance Message */}
-              <div className="mb-6 p-3 md:p-4 bg-slate-800/50 border-l-4 border-slate-600 flex flex-wrap items-center justify-center gap-2 clip-corner">
+              <div className="mb-6 p-3 md:p-4 bg-blue-500/10 border border-blue-300/20 flex flex-wrap items-center justify-center gap-2 clip-corner">
                 <img src="/icon/competition.png" alt="Performance" className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
                 <p className="text-sm md:text-xl font-bold text-white uppercase tracking-wide break-words">{getPerformanceMessage()}</p>
                 <img src="/icon/competition.png" alt="Performance" className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
@@ -763,12 +782,12 @@ export default function TypingTestPage() {
                   onChange={(e) => setPlayerName(e.target.value)}
                   placeholder="Enter your name"
                   disabled={isSaving}
-                  className="w-full p-2.5 md:p-4 mb-3 md:mb-4 bg-slate-800 border-2 border-slate-600 focus:outline-none focus:border-slate-500 text-white placeholder-gray-400 text-sm md:text-lg clip-corner uppercase disabled:opacity-50"
+                  className="w-full p-2.5 md:p-4 mb-3 md:mb-4 bg-[#0d1a2c] border border-white/10 focus:outline-none focus:border-blue-300/60 focus:ring-4 focus:ring-blue-500/15 text-white placeholder-gray-400 text-sm md:text-lg clip-corner uppercase disabled:opacity-50"
                 />
                 <button
                   onClick={saveScore}
                   disabled={isSaving}
-                  className="w-full px-4 py-2.5 md:px-6 md:py-4 bg-green-600 hover:bg-green-700 text-white font-bold text-sm md:text-lg shadow-xl transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto clip-corner uppercase tracking-wider"
+                  className="w-full px-4 py-2.5 md:px-6 md:py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold text-sm md:text-lg shadow-[0_18px_45px_rgba(16,185,129,0.24)] transition-all duration-300 hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mx-auto clip-corner uppercase tracking-wider"
                 >
                   {isSaving ? (
                     <>
@@ -787,14 +806,14 @@ export default function TypingTestPage() {
               <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center px-4">
                 <button
                   onClick={resetTest}
-                  className="px-6 md:px-10 py-2.5 md:py-4 bg-slate-700 hover:bg-slate-600 text-white text-sm md:text-lg font-bold shadow-xl transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
+                  className="px-6 md:px-10 py-2.5 md:py-4 bg-blue-500 hover:bg-blue-400 text-white text-sm md:text-lg font-bold shadow-[0_18px_45px_rgba(37,99,235,0.24)] transition-all duration-300 hover:-translate-y-1 flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
                 >
                   <img src="/icon/restart.png" alt="Restart" className="w-4 h-4 md:w-5 md:h-5" />
                   <span>Try Again</span>
                 </button>
                 <Link
                   href="/"
-                  className="px-6 md:px-10 py-2.5 md:py-4 bg-slate-800 border-l-4 border-slate-700 text-white text-sm md:text-lg font-bold hover:bg-slate-700 hover:scale-105 transition-all duration-300 inline-flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
+                  className="px-6 md:px-10 py-2.5 md:py-4 bg-white/[0.07] border border-white/10 text-white text-sm md:text-lg font-bold hover:bg-white/[0.11] hover:-translate-y-1 transition-all duration-300 inline-flex items-center justify-center gap-2 clip-corner uppercase tracking-wider"
                 >
                   <img src="/icon/meteoricon.png" alt="Home" className="w-4 h-4 md:w-5 md:h-5" />
                   <span>Home</span>
@@ -804,10 +823,10 @@ export default function TypingTestPage() {
           )}
 
           {/* Leaderboard - Same as before but with break-words */}
-          <div className="mt-6 md:mt-10 bg-slate-900/50 border-l-4 border-slate-700 p-3 md:p-8 clip-corner-lg">
+          <div className="mt-6 md:mt-10 bg-white/[0.045] border border-white/10 p-3 md:p-8 clip-corner-lg shadow-[0_24px_75px_rgba(2,6,23,0.24)]">
             <h3 className="text-xl md:text-3xl font-black mb-3 md:mb-6 text-center flex flex-wrap items-center justify-center gap-2 uppercase tracking-wider px-4">
               <img src="/icon/leaderboard.png" alt="Leaderboard" className="w-6 h-6 md:w-10 md:h-10 shrink-0" />
-              <span className="text-xs md:text-base break-words">Leaderboard - <span className="bg-linear-to-r from-slate-200 to-white bg-clip-text text-transparent">{config.name}</span></span>
+              <span className="text-xs md:text-base break-words">Leaderboard - <span className="bg-linear-to-r from-blue-200 to-white bg-clip-text text-transparent">{config.name}</span></span>
             </h3>
             <div className="space-y-2 md:space-y-3">
               {leaderboard.length > 0 ? (
@@ -815,8 +834,8 @@ export default function TypingTestPage() {
                   <div
                     key={index}
                     className={`flex flex-col md:flex-row items-start md:items-center justify-between p-2.5 md:p-4 ${
-                      index < 3 ? 'bg-slate-800/50 border-l-4 border-slate-400' : 'bg-slate-900/30 border-l-4 border-slate-700/30'
-                    } hover:bg-slate-700/40 hover:border-slate-600 transition-all duration-300 clip-corner`}
+                      index < 3 ? 'bg-blue-500/12 border border-blue-300/45' : 'bg-white/[0.035] border border-white/10'
+                    } hover:bg-white/[0.075] hover:border-blue-300/40 transition-all duration-300 clip-corner`}
                   >
                     <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0 w-full md:w-auto mb-2 md:mb-0">
                       <div className={`w-8 h-8 md:w-12 md:h-12 flex items-center justify-center font-black text-lg md:text-2xl shrink-0 clip-corner-sm ${
